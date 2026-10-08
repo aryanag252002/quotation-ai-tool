@@ -6,12 +6,12 @@ import { quotePackage } from "@/lib/engine/pricing";
 import { usd } from "@/lib/format";
 import type { Deal } from "@/lib/types";
 
-/** Shows the stored fee, or the live engine draft for deals with workspace data. */
+/** Shows the submitted fee, or the live engine draft for deals with workspace data. */
 export function DealFee({ deal, workspace }: { deal: Deal; workspace?: DealWorkspaceData | null }) {
   const { config } = usePricingConfig();
-  if (workspace) {
+  if (workspace && !deal.monthlyFee) {
     const inScope = new Set(workspace.scope.filter((s) => s.included).map((s) => s.serviceId));
-    const fee = quotePackage(config, "growth", workspace.workloadDrivers, inScope).monthlyFee;
+    const fee = quotePackage(config, workspace.recommendedPackage, workspace.workloadDrivers, inScope).monthlyFee;
     return (
       <span className="num">
         {usd(fee)}

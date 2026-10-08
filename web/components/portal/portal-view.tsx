@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useHydrated } from "@/hooks/use-hydrated";
+import { updateCustomDeal, useCustomDeal } from "@/lib/state/custom-deals";
+import type { LedgerSystem } from "@/lib/types";
 import { Check, CheckCircle2, Clock, FileUp, Loader2, Lock, ShieldCheck, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,18 +13,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-const SYSTEMS = ["QuickBooks Online", "Xero", "Zoho Books", "Sage", "NetSuite", "FreshBooks"];
+const SYSTEMS: { id: LedgerSystem; label: string }[] = [
+  { id: "qbo", label: "QuickBooks Online" },
+  { id: "xero", label: "Xero" },
+  { id: "zoho", label: "Zoho Books" },
+  { id: "sage", label: "Sage" },
+  { id: "netsuite", label: "NetSuite" },
+];
+
+const QUESTIONS = [
+  ["services", "What services are you looking for?", "e.g. bookkeeping, bill pay, payroll"],
+  ["why", "What’s prompting the change?", ""],
+  ["tools", "Other tools you use", "e.g. Shopify, Stripe, Gusto"],
+  ["employees", "Number of employees", ""],
+  ["start", "Ideal start date", ""],
+  ["budget", "Monthly budget range", ""],
+] as const;
 const STEPS = ["Connect your books", "A few questions", "Review & submit"];
 
-export function PortalView({ prospect, kpo }: { prospect: string; kpo: string }) {
+export function PortalView({ token, prospect, kpo }: { token: string; prospect: string | null; kpo: string }) {
+  const hydrated = useHydrated();
+  const custom = useCustomDeal(token);
+  const name = custom?.prospect.name ?? prospect ?? "your company";
   const [step, setStep] = useState(0);
-  const [connecting, setConnecting] = useState<string | null>(null);
-  const [connected, setConnected] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [connecting, setConnecting] = useState<LedgerSystem | null>(null);
+  const [connected, setConnected] = useState<LedgerSystem | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
   const [done, setDone] = useState(false);
 
-  const connect = (system: string) => {
+  const connect = (system: LedgerSystem) => {
     setConnecting(system);
     window.setTimeout(() => {
       setConnecting(null);
@@ -30,8 +52,33 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
   };
 
   const ready = !!connected || files.length > 0;
+  const connectedLabel = SYSTEMS.find((s) => s.id === connected)?.label ?? null;
 
-  if (done) {
+  const submit = () => {
+    if (custom) {
+      updateCustomDeal(custom.id, (d) => ({
+        ...d,
+        system: connected ?? "upload",
+        accessPath: connected ? "prospect_oauth" : "file_upload",
+        portalAnswers: QUESTIONS.filter(([id]) => answers[id]?.trim()).map(([id, label]) => ({ q: label, a: answers[id].trim() })),
+        progress: { ...d.progress, connectedAt: new Date().toISOString(), connectedBy: d.prospect.contactName },
+      }));
+    }
+    setDone(true);
+  };
+
+  if (hydrated && !prospect && !custom) {
+    return (
+      <Card className="mx-auto max-w-xl text-center">
+        <CardContent className="space-y-3 py-10">
+          <h2 className="text-lg font-semibold">This link has expired</h2>
+          <p className="text-sm text-muted-foreground">Ask {kpo} for a new secure link.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (done || custom?.progress.connectedAt) {
     return (
       <Card className="mx-auto max-w-xl text-center">
         <CardContent className="space-y-3 py-10">
@@ -39,7 +86,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
           <h2 className="text-lg font-semibold">Thank you, you’re all set</h2>
           <p className="text-sm text-muted-foreground">
             {kpo} will review your books and send a short agenda before your consultation. You can revoke access at any time
-            from {connected ?? "your accounting software"}.
+            from {connectedLabel ?? "your accounting software"}.
           </p>
         </CardContent>
       </Card>
@@ -51,7 +98,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
       <div className="space-y-1 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-balance">Get your quote from {kpo}</h1>
         <p className="text-sm text-muted-foreground">
-          For {prospect}. Takes about 5 minutes, and your quote arrives the day after your consultation.
+          For {name}. Takes about 5 minutes, and your quote arrives the day after your consultation.
         </p>
       </div>
 
@@ -81,7 +128,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {SYSTEMS.map((s) => {
+              {SYSTEMS.map(({ id: s, label }) => {
                 const isConnected = connected === s;
                 return (
                   <button
@@ -96,7 +143,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
                     )}
                   >
                     {connecting === s ? <Loader2 className="size-4 animate-spin" aria-hidden /> : isConnected ? <CheckCircle2 className="size-4" aria-hidden /> : null}
-                    {connecting === s ? "Connecting…" : isConnected ? `${s} connected` : s}
+                    {connecting === s ? "Connecting…" : isConnected ? `${label} connected` : label}
                   </button>
                 );
               })}
@@ -161,19 +208,20 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
             <CardDescription>Helps us prepare a focused consultation. All optional.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            {[
-              ["services", "What services are you looking for?", "e.g. bookkeeping, bill pay, payroll"],
-              ["why", "What’s prompting the change?", ""],
-              ["tools", "Other tools you use", "e.g. Shopify, Stripe, Gusto"],
-              ["employees", "Number of employees", ""],
-              ["start", "Ideal start date", ""],
-              ["budget", "Monthly budget range", ""],
-            ].map(([id, label, ph]) => (
-              <div key={id} className={cn("space-y-1.5", id === "why" && "sm:col-span-2")}>
-                <Label htmlFor={`q-${id}`}>{label}</Label>
-                {id === "why" ? <Textarea id={`q-${id}`} placeholder={ph} /> : <Input id={`q-${id}`} placeholder={ph} />}
-              </div>
-            ))}
+            {QUESTIONS.map(([id, label, ph]) => {
+              const field = {
+                id: `q-${id}`,
+                placeholder: ph,
+                value: answers[id] ?? "",
+                onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setAnswers((a) => ({ ...a, [id]: e.target.value })),
+              };
+              return (
+                <div key={id} className={cn("space-y-1.5", id === "why" && "sm:col-span-2")}>
+                  <Label htmlFor={`q-${id}`}>{label}</Label>
+                  {id === "why" ? <Textarea {...field} /> : <Input {...field} />}
+                </div>
+              );
+            })}
           </CardContent>
           <CardFooter className="justify-between border-t pt-4">
             <Button variant="ghost" onClick={() => setStep(0)}>
@@ -193,7 +241,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
             <dl className="space-y-2">
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Books</dt>
-                <dd className="font-medium">{connected ?? `${files.length} file(s) uploaded`}</dd>
+                <dd className="font-medium">{connectedLabel ?? `${files.length} file(s) uploaded`}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">History used</dt>
@@ -212,7 +260,7 @@ export function PortalView({ prospect, kpo }: { prospect: string; kpo: string })
             <Button variant="ghost" onClick={() => setStep(1)}>
               Back
             </Button>
-            <Button disabled={!consent} onClick={() => setDone(true)}>
+            <Button disabled={!consent} onClick={submit}>
               Submit
             </Button>
           </CardFooter>

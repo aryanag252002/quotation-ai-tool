@@ -33,6 +33,23 @@ Open **Pricing & catalog** to change a time standard and watch the quote re-pric
 (bottom-left) to switch between Analyst / Manager / Partner when approving. **Reset demo** on the deal
 header restores the AI draft.
 
+### Add your own prospect (live flow)
+
+**New prospect** creates a quote you can walk end to end in front of the client:
+
+1. Fill in the company, contact, industry and accounting system. Under **Simulated books**, pick a size
+   (Small / Growing / Complex) and a condition (Clean / Behind / Messy). This decides the generated ledger.
+2. **Open prospect portal** (new tab) and act as the prospect: connect the books, answer the
+   questionnaire, consent, submit. The quote tab updates by itself and runs the analysis. For the
+   accountant-invite path, click **Connect … as accountant** instead.
+3. Review the analysis and brief, then **Schedule consultation** (Zoom / Teams / Meet).
+4. On **Consultation**, click **Simulate: call ends, transcript arrives**. A transcript, requirements,
+   brief answers and any volume contradiction are generated.
+5. Scope, pricing and approval work exactly as for Brightside.
+
+Added prospects are stored in this browser only (no backend yet). **Restart demo** returns one to
+“awaiting data”; the bin icon deletes it.
+
 ## Status
 
 Phase 1: design docs + clickable front end on mock data. The analysis rules and the pricing engine are

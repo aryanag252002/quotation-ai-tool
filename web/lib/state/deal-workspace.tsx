@@ -6,7 +6,9 @@
  */
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { usePricingConfig } from "@/lib/config/pricing-config-context";
-import { persistedStore, usePersisted } from "@/lib/state/persisted-store";
+import { ALL_DONE, decisionStore, deriveStage, type DecisionState, type Milestones } from "@/lib/state/decisions";
+import { touchMinutes } from "@/lib/state/custom-deals";
+import { usePersisted } from "@/lib/state/persisted-store";
 import type { DealWorkspaceData } from "@/lib/data";
 import {
   complexityMultiplier,
@@ -19,47 +21,19 @@ import {
   type MultiplierResult,
   type PackageQuote,
 } from "@/lib/engine/pricing";
-import type {
-  ApprovalEvent,
-  BriefQuestion,
-  Confidence,
-  Deal,
-  DealStage,
-  MeetingPlatform,
-  OverrideReason,
-  PackageId,
-  WorkloadDrivers,
-} from "@/lib/types";
+import type { ApprovalEvent, Confidence, CustomDeal, Deal, DealStage, PackageId, WorkloadDrivers } from "@/lib/types";
 
-export type QuoteStatus = "draft" | "submitted" | "approved" | "changes_requested" | "sent";
+export type { QuoteStatus } from "@/lib/state/decisions";
 
-interface DecisionState {
-  briefQuestions: BriefQuestion[];
-  briefReviewed: boolean;
-  findingStatus: Record<string, "proposed" | "accepted" | "rejected">;
-  scheduledCall: { platform: MeetingPlatform; at: string } | null;
-  scopeIncluded: Record<string, boolean>;
-  contradictionResolution: Record<string, "data" | "client">;
-  recommendedPackage: PackageId;
-  overrideFee: number | null;
-  overrideReason: OverrideReason | null;
-  overrideNote: string;
-  protection: "true_up" | "contingency";
-  status: QuoteStatus;
-  /** Fee and cleanup at submission; approval is void if either changes. */
-  submittedQuote: { fee: number; cleanup: number } | null;
-  events: ApprovalEvent[];
-}
-
-function initialDecisions(data: DealWorkspaceData): DecisionState {
+function initialDecisions(data: DealWorkspaceData, fresh: boolean): DecisionState {
   return {
     briefQuestions: data.briefQuestions,
-    briefReviewed: true,
+    briefReviewed: !fresh,
     findingStatus: Object.fromEntries(data.findings.map((f) => [f.id, f.status])),
-    scheduledCall: { platform: data.meeting.platform, at: data.meeting.startedAt },
+    scheduledCall: fresh ? null : { platform: data.meeting.platform, at: data.meeting.startedAt },
     scopeIncluded: Object.fromEntries(data.scope.map((s) => [s.serviceId, s.included])),
     contradictionResolution: Object.fromEntries(data.contradictions.map((c) => [c.id, c.resolution])),
-    recommendedPackage: "growth",
+    recommendedPackage: data.recommendedPackage,
     overrideFee: null,
     overrideReason: null,
     overrideNote: "",
@@ -71,7 +45,11 @@ function initialDecisions(data: DealWorkspaceData): DecisionState {
 }
 
 interface WorkspaceValue extends DecisionState {
+  /** The deal with its live stage (and live human time for demo prospects). */
   deal: Deal;
+  milestones: Milestones;
+  /** Set for prospects added during a demo. */
+  custom?: CustomDeal;
   data: DealWorkspaceData;
   set: <K extends keyof DecisionState>(key: K, value: DecisionState[K]) => void;
   addEvent: (event: Omit<ApprovalEvent, "at">) => void;
@@ -96,24 +74,24 @@ interface WorkspaceValue extends DecisionState {
 }
 
 const Ctx = createContext<WorkspaceValue | null>(null);
-const key = (dealId: string) => `quoteiq.deal.${dealId}.v1`;
 
 export function DealWorkspaceProvider({
   deal,
   data,
+  custom,
+  milestones = ALL_DONE,
   children,
 }: {
   deal: Deal;
   data: DealWorkspaceData;
+  custom?: CustomDeal;
+  milestones?: Milestones;
   children: React.ReactNode;
 }) {
   const { config } = usePricingConfig();
-  const store = useMemo(
-    () => persistedStore<Partial<DecisionState>>(key(deal.id), {}, (v) => typeof v === "object" && v !== null),
-    [deal.id],
-  );
+  const store = useMemo(() => decisionStore(deal.id), [deal.id]);
   const saved = usePersisted(store);
-  const state = useMemo<DecisionState>(() => ({ ...initialDecisions(data), ...saved }), [data, saved]);
+  const state = useMemo<DecisionState>(() => ({ ...initialDecisions(data, !!custom), ...saved }), [data, saved, custom]);
 
   const set = useCallback<WorkspaceValue["set"]>(
     (k, v) => store.set((prev) => ({ ...prev, [k]: v })),
@@ -165,12 +143,9 @@ export function DealWorkspaceProvider({
       premium: quotePackage(config, "premium", drivers, inScope, { contingency }),
     };
     const cleanup = quoteCleanup(config, data.cleanupDrivers, drivers);
-    const confidenceReasons = [
-      "Payroll headcount comes from the call, not the ledger",
-      "Bank-feed backlog confirmed verbally (not visible via API)",
-    ];
-    if (useClientVolume) confidenceReasons.unshift("Volume set to the client’s estimate, below what the ledger shows");
-    const confidence: Confidence = useClientVolume ? "low" : "medium";
+    const confidenceReasons = [...data.confidence.reasons];
+    if (useClientVolume) confidenceReasons.unshift("Volume set to the client’s estimate, not what the ledger shows");
+    const confidence: Confidence = useClientVolume ? "low" : data.confidence.level;
     const recommended = quotes[state.recommendedPackage];
     const engineFee = recommended.monthlyFee;
     const finalFee = state.overrideFee ?? engineFee;
@@ -186,13 +161,12 @@ export function DealWorkspaceProvider({
       pending &&
       !!state.submittedQuote &&
       (state.submittedQuote.fee !== finalFee || state.submittedQuote.cleanup !== cleanup.fee);
-    const liveStage: DealStage =
-      state.status === "sent"
-        ? "sent"
-        : pending || state.status === "changes_requested"
-          ? "pending_approval"
-          : deal.stage;
+    const liveStage: DealStage = deriveStage(deal.stage, milestones, state);
+    const liveDeal: Deal = custom
+      ? { ...deal, stage: liveStage, touchMinutes: touchMinutes(custom, state), monthlyFee: finalFee, cleanupFee: cleanup.fee }
+      : deal;
     return {
+      deal: liveDeal,
       isStale,
       liveStage,
       drivers,
@@ -207,11 +181,11 @@ export function DealWorkspaceProvider({
       finalFee,
       approval,
     };
-  }, [config, data, state, deal.stage]);
+  }, [config, data, state, deal, custom, milestones]);
 
   const value = useMemo<WorkspaceValue>(
-    () => ({ ...state, ...derived, deal, data, set, addEvent, resetDecisions, submit }),
-    [state, derived, deal, data, set, addEvent, resetDecisions, submit],
+    () => ({ ...state, ...derived, data, custom, milestones, set, addEvent, resetDecisions, submit }),
+    [state, derived, data, custom, milestones, set, addEvent, resetDecisions, submit],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
 import { DealHeader } from "@/components/deal/deal-header";
 import { DealStepper } from "@/components/deal/deal-stepper";
+import { DealSkeleton } from "@/components/deal/deal-skeleton";
 import { LimitedDeal } from "@/components/deal/limited-deal";
-import { LiveDealStepper, LiveStagePill } from "@/components/deal/live-progress";
+import { LiveDealHeader, LiveDealStepper } from "@/components/deal/live-progress";
+import { LocalDealShell } from "@/components/deal/local-deal-shell";
 import { ResetDemoButton } from "@/components/deal/reset-demo-button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { getDeal, getDeals, getDealWorkspace, getUsers } from "@/lib/data";
 import { DealWorkspaceProvider } from "@/lib/state/deal-workspace";
 
@@ -27,7 +27,8 @@ export default function DealLayout({ children, params }: LayoutProps<"/deals/[id
 
 async function DealShell({ id, children }: { id: string; children: React.ReactNode }) {
   const [deal, workspace, users] = await Promise.all([getDeal(id), getDealWorkspace(id), getUsers()]);
-  if (!deal) notFound();
+  // Prospects added during the demo live in the browser, not on the server.
+  if (!deal) return <LocalDealShell id={id} users={users}>{children}</LocalDealShell>;
   const owner = users.find((u) => u.id === deal.ownerId);
 
   if (!workspace) {
@@ -44,24 +45,11 @@ async function DealShell({ id, children }: { id: string; children: React.ReactNo
     <DealWorkspaceProvider deal={deal} data={workspace}>
       <div className="space-y-5">
         <div className="space-y-5 print:hidden">
-          <DealHeader deal={deal} owner={owner} actions={<ResetDemoButton />} stageSlot={<LiveStagePill />} />
+          <LiveDealHeader owner={owner} actions={<ResetDemoButton />} />
           <LiveDealStepper />
         </div>
         <div>{children}</div>
       </div>
     </DealWorkspaceProvider>
-  );
-}
-
-function DealSkeleton() {
-  return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading quote">
-      <Skeleton className="h-14 w-2/3" />
-      <Skeleton className="h-11 w-full" />
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Skeleton className="h-64 lg:col-span-2" />
-        <Skeleton className="h-64" />
-      </div>
-    </div>
   );
 }

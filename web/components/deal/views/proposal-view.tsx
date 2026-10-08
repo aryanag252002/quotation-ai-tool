@@ -5,6 +5,7 @@ import { Check, CheckCircle2, Clock, FileDown, Send, ShieldCheck, Undo2, UserRou
 import { toast } from "sonner";
 import { AiBadge, Pill } from "@/components/app/status";
 import { buildAssumptions } from "@/components/deal/assumptions";
+import { shortName } from "@/lib/data/generate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -171,7 +172,10 @@ function ProposalDocument() {
   const allServices = config.services.filter((s) =>
     config.packages.some((p) => ws.quotes[p.id].services.some((x) => x.service.id === s.id)),
   );
-  const issued = "2026-10-08T00:00:00Z";
+  const issued = ws.custom ? (ws.events.at(-1)?.at ?? ws.custom.progress.transcriptAt ?? ws.custom.createdAt) : "2026-10-08T00:00:00Z";
+  const recServices = ws.quotes[rec.id].services
+    .filter((x) => !["bookkeeping", "reconciliation", "basic_financials"].includes(x.service.id))
+    .map((x) => x.service.name.toLowerCase());
   return (
     <Card className="xl:col-span-2 print:col-span-3 print:shadow-none print:ring-0">
       <CardContent className="space-y-8 p-6 sm:p-10">
@@ -261,19 +265,25 @@ function ProposalDocument() {
             </Table>
           </div>
           <p className="mt-2 text-sm">
-            We recommend <span className="font-medium">{rec.name}</span>: it covers accounts payable, invoicing,
-            sales tax and a proper month-end close by day {rec.closeDay}, as discussed on our call.
+            We recommend <span className="font-medium">{rec.name}</span>: on top of bookkeeping and reconciliations it
+            covers {recServices.length ? listJoin(recServices.slice(0, 5)) : "monthly financial statements"}, with the close
+            completed by day {rec.closeDay}, as discussed on our call.
           </p>
         </Section>
 
         <Section n={4} title="One-time cleanup project">
-          <p className="text-sm">
-            Bring the books current before monthly service starts: reconcile {data.cleanupDrivers.unreconciledAccountMonths}{" "}
-            account-months, recategorise suspense items, clear undeposited funds and catch up September. Estimated{" "}
-            <span className="num">{hrs(ws.cleanup.hours)}</span>, completed before your December investor update.
-          </p>
-          <p className="num mt-2 text-lg font-semibold">{usd(ws.cleanup.fee)}</p>
-          <p className="text-xs text-muted-foreground">50% on signature, 50% on completion.</p>
+          {ws.cleanup.fee > 0 ? (
+            <>
+              <p className="text-sm">
+                {data.cleanup.summary} Estimated <span className="num">{hrs(ws.cleanup.hours)}</span>, completed{" "}
+                {data.cleanup.deadline}.
+              </p>
+              <p className="num mt-2 text-lg font-semibold">{usd(ws.cleanup.fee)}</p>
+              <p className="text-xs text-muted-foreground">50% on signature, 50% on completion.</p>
+            </>
+          ) : (
+            <p className="text-sm">Your books are current, so no cleanup project is needed. Monthly service starts straight away.</p>
+          )}
         </Section>
 
         <Section n={5} title="Onboarding timeline">
@@ -286,7 +296,7 @@ function ProposalDocument() {
 
         <Section n={6} title="Assumptions">
           <ul className="list-disc space-y-1 pl-4 text-sm">
-            {buildAssumptions(ws.drivers, ws.scopeIncluded).map((a) => (
+            {buildAssumptions(ws.drivers, ws.scopeIncluded, { clientName: shortName(deal.prospect.name), payrollProvider: data.payrollProvider }).map((a) => (
               <li key={a}>{a}</li>
             ))}
             {ws.protection === "true_up" ? <li>Fees are reviewed after 90 days of actual volumes.</li> : null}
@@ -334,4 +344,8 @@ function Section({ n, title, children }: { n: number; title: string; children: R
       {children}
     </section>
   );
+}
+
+function listJoin(xs: string[]) {
+  return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 }

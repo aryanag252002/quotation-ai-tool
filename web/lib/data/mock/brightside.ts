@@ -320,3 +320,20 @@ export const activity: { at: string; label: string; actor: string; minutes?: num
   { at: "2026-10-07T17:41:00Z", label: "Transcript received via Zoom webhook", actor: "QuoteIQ" },
   { at: "2026-10-07T17:43:00Z", label: "Requirements extracted · scope and pricing drafted", actor: "QuoteIQ" },
 ];
+
+export const recommendedPackage = "growth" as const;
+export const payrollProvider = "Gusto";
+
+export const confidence = {
+  level: "medium" as const,
+  reasons: [
+    "Payroll headcount comes from the call, not the ledger",
+    "Bank-feed backlog confirmed verbally (not visible via API)",
+  ],
+};
+
+export const cleanup = {
+  summary:
+    "Bring the books current before monthly service starts: reconcile 35 account-months, recategorise suspense items, clear undeposited funds and catch up September.",
+  deadline: "before your December investor update",
+};

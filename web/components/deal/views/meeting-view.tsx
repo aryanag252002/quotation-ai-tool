@@ -21,11 +21,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { clock, dateTime, PLATFORM_LABEL } from "@/lib/format";
+import { shortName } from "@/lib/data/generate";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
 
 export function MeetingView() {
-  const { data, briefQuestions, contradictionResolution, set } = useDealWorkspace();
+  const { deal, data, briefQuestions, contradictionResolution, set } = useDealWorkspace();
   const { meeting, transcript, requirements, briefAnswers, contradictions, openItems } = data;
   const [active, setActive] = useState<string[]>([]);
   const segRefs = useRef<Record<string, HTMLLIElement | null>>({});
@@ -53,7 +54,7 @@ export function MeetingView() {
   );
 
   const pipeline = [
-    { label: "Scheduled via calendar", time: "Oct 5" },
+    { label: "Linked via calendar invite", time: "" },
     { label: `Recorded on ${PLATFORM_LABEL[meeting.platform]}`, time: `${meeting.durationMinutes} min` },
     { label: "Transcript received (webhook)", time: dateTime(meeting.transcriptReceivedAt) },
     { label: "Requirements extracted", time: `${Math.floor(meeting.extractionSeconds / 60)}m ${meeting.extractionSeconds % 60}s` },
@@ -180,6 +181,11 @@ export function MeetingView() {
               </TabsContent>
 
               <TabsContent value="conflicts" className="mt-3 space-y-3">
+                {contradictions.length === 0 ? (
+                  <p className="flex items-center gap-2 rounded-md border p-3 text-sm text-muted-foreground">
+                    <CheckCircle2 className="size-4 text-success" aria-hidden /> What the client said matches the ledger.
+                  </p>
+                ) : null}
                 {contradictions.map((c) => (
                   <div key={c.id} className="space-y-3 rounded-md border border-warning/40 bg-warning-soft/50 p-3">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -223,7 +229,12 @@ export function MeetingView() {
                     </li>
                   ))}
                 </ul>
-                <FollowUpDialog contactFirstName="Maya" items={openItems} />
+                <FollowUpDialog
+                  contactFirstName={deal.prospect.contactName.split(" ")[0]}
+                  company={shortName(deal.prospect.name)}
+                  analyst={meeting.attendees[0]?.split(" (")[0] ?? "Priya"}
+                  items={openItems}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -233,10 +244,20 @@ export function MeetingView() {
   );
 }
 
-function FollowUpDialog({ contactFirstName, items }: { contactFirstName: string; items: string[] }) {
-  const draft = `Hi ${contactFirstName},\n\nThanks for your time today. It was great to learn more about Brightside. To finalise your proposal, could you help us with a few items?\n\n${items
+function FollowUpDialog({
+  contactFirstName,
+  company,
+  analyst,
+  items,
+}: {
+  contactFirstName: string;
+  company: string;
+  analyst: string;
+  items: string[];
+}) {
+  const draft = `Hi ${contactFirstName},\n\nThanks for your time today. It was great to learn more about ${company}. To finalise your proposal, could you help us with a few items?\n\n${items
     .map((i) => `• ${i}`)
-    .join("\n")}\n\nWe’ll send the proposal with a cleanup plan and package options by tomorrow.\n\nBest,\nPriya`;
+    .join("\n")}\n\nWe’ll send the proposal with a cleanup plan and package options by tomorrow.\n\nBest,\n${analyst.split(" ")[0]}`;
   const [text, setText] = useState(draft);
   return (
     <Dialog>

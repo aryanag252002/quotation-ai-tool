@@ -25,7 +25,7 @@ export function DealHeader({
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <Building2 className="size-4" aria-hidden /> {deal.prospect.industryLabel} · {deal.prospect.location}
+            <Building2 className="size-4" aria-hidden /> {[deal.prospect.industryLabel, deal.prospect.location].filter(Boolean).join(" · ")}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <UserRound className="size-4" aria-hidden /> {deal.prospect.contactName}, {deal.prospect.contactTitle}

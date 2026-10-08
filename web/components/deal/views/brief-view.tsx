@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { CalendarClock, CheckCircle2, CircleAlert, Plus, Trash2, Video } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Plus, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { AiBadge, Pill } from "@/components/app/status";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import type { MeetingPlatform } from "@/lib/types";
 
 export function BriefView() {
-  const { data, briefQuestions, briefReviewed, scheduledCall, findingStatus, set } = useDealWorkspace();
+  const { deal, data, briefQuestions, briefReviewed, scheduledCall, findingStatus, set } = useDealWorkspace();
   const flags = data.findings.filter((f) => f.severity !== "low" && findingStatus[f.id] !== "rejected");
 
   const updateQuestion = (id: string, question: string) =>
@@ -107,6 +108,7 @@ export function BriefView() {
 
       <div className="space-y-4">
         <ScheduleCard
+          meetingHref={`/deals/${deal.id}/meeting`}
           scheduled={scheduledCall}
           onSave={(platform, at) => {
             set("scheduledCall", { platform, at });
@@ -139,14 +141,16 @@ export function BriefView() {
 }
 
 function ScheduleCard({
+  meetingHref,
   scheduled,
   onSave,
 }: {
+  meetingHref: string;
   scheduled: { platform: MeetingPlatform; at: string } | null;
   onSave: (platform: MeetingPlatform, at: string) => void;
 }) {
   const [platform, setPlatform] = useState<MeetingPlatform>(scheduled?.platform ?? "zoom");
-  const [at, setAt] = useState((scheduled?.at ?? "2026-10-07T17:00:00Z").slice(0, 16));
+  const [at, setAt] = useState(() => toLocalInput(scheduled?.at ?? tomorrowAt10()));
 
   return (
     <Card>
@@ -158,7 +162,7 @@ function ScheduleCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {scheduled ? (
-          <div className="flex items-center gap-3 rounded-md border p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-md border p-3">
             <Video className="size-5 text-primary" aria-hidden />
             <div className="text-sm">
               <div className="font-medium">{PLATFORM_LABEL[scheduled.platform]}</div>
@@ -217,7 +221,28 @@ function ScheduleCard({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {scheduled ? (
+          <Button asChild size="sm" className="w-full">
+            <Link href={meetingHref}>
+              Go to consultation <ArrowRight />
+            </Link>
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );
+}
+
+/** ISO → value for <input type="datetime-local"> in the viewer's time zone. */
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function tomorrowAt10() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  return d.toISOString();
 }

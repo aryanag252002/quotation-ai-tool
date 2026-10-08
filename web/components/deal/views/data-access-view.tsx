@@ -6,6 +6,7 @@ import { Pill } from "@/components/app/status";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { dateTime, int, SYSTEM_LABEL } from "@/lib/format";
+import { externalIdLabel } from "@/lib/data/generate";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 
 const ACCESS_LABEL = {
@@ -43,7 +44,7 @@ export function DataAccessView() {
                 ["System", SYSTEM_LABEL[c.system]],
                 ["Access path", ACCESS_LABEL[c.accessPath]],
                 ["Company", c.companyName],
-                ["Company ID (realmId)", <span key="r" className="num">{c.externalId}</span>],
+                [externalIdLabel(c.system), <span key="r" className="num">{c.externalId}</span>],
                 ["Connected by", `${c.connectedBy} · ${dateTime(c.connectedAt)}`],
                 ["History window", `${c.windowMonths} months`],
               ].map(([k, v]) => (
@@ -55,10 +56,18 @@ export function DataAccessView() {
             </dl>
           </CardContent>
           <CardFooter className="flex-wrap gap-2 border-t bg-muted/40 py-3">
-            <Pill tone="success" icon={ShieldCheck}>Read-only enforced by QuoteIQ</Pill>
-            <span className="text-xs text-muted-foreground">
-              QuickBooks grants read/write; our client issues GET/query calls only and logs every call.
-            </span>
+            {c.system === "upload" ? (
+              <span className="text-xs text-muted-foreground">
+                Exports uploaded by the prospect. Nothing connects to their accounting software.
+              </span>
+            ) : (
+              <>
+                <Pill tone="success" icon={ShieldCheck}>Read-only enforced by QuoteIQ</Pill>
+                <span className="text-xs text-muted-foreground">
+                  {SYSTEM_LABEL[c.system]} grants read/write; our client issues read calls only and logs every call.
+                </span>
+              </>
+            )}
           </CardFooter>
         </Card>
 

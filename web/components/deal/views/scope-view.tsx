@@ -13,6 +13,7 @@ import { usePricingConfig } from "@/lib/config/pricing-config-context";
 import { serviceHours } from "@/lib/engine/pricing";
 import { clock, hrs } from "@/lib/format";
 import { buildAssumptions } from "@/components/deal/assumptions";
+import { shortName } from "@/lib/data/generate";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,10 @@ export function ScopeView() {
   const segStart = Object.fromEntries(data.transcript.map((s) => [s.id, s.start]));
   const inScopeCount = data.scope.filter((l) => scopeIncluded[l.serviceId] || required.has(l.serviceId)).length;
 
-  const assumptions = buildAssumptions(drivers, scopeIncluded);
+  const assumptions = buildAssumptions(drivers, scopeIncluded, {
+    clientName: shortName(deal.prospect.name),
+    payrollProvider: data.payrollProvider,
+  });
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">

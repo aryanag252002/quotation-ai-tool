@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,6 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { useCustomDeals } from "@/lib/state/custom-deals";
 
 const LABELS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -29,13 +30,15 @@ const LABELS: Record<string, string> = {
   brightside: "Brightside Coffee Roasters",
 };
 
-function labelFor(segment: string) {
-  return LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
+function labelFor(segment: string, custom: Record<string, string>) {
+  return LABELS[segment] ?? custom[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
 export function AppHeader() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
+  const customDeals = useCustomDeals();
+  const customNames = useMemo(() => Object.fromEntries(customDeals.map((d) => [d.id, d.prospect.name])), [customDeals]);
 
   return (
     <header className="sticky top-0 z-20 flex print:hidden h-12 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/75">
@@ -51,10 +54,10 @@ export function AppHeader() {
                 {i > 0 ? <BreadcrumbSeparator /> : null}
                 <BreadcrumbItem className="min-w-0">
                   {last ? (
-                    <BreadcrumbPage className="truncate">{labelFor(seg)}</BreadcrumbPage>
+                    <BreadcrumbPage className="truncate">{labelFor(seg, customNames)}</BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild className="truncate">
-                      <Link href={href}>{labelFor(seg)}</Link>
+                      <Link href={href}>{labelFor(seg, customNames)}</Link>
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>

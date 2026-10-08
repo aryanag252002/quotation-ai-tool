@@ -4,7 +4,9 @@
  */
 import * as brightside from "@/lib/data/mock/brightside";
 import { deals, tenant, users, weeklyThroughput } from "@/lib/data/mock/pipeline";
-import type { Deal, User } from "@/lib/types";
+import type { Deal, DealWorkspaceData, User } from "@/lib/types";
+
+export type { DealWorkspaceData } from "@/lib/types";
 
 export async function getTenant() {
   return tenant;
@@ -26,11 +28,11 @@ export async function getWeeklyThroughput() {
   return weeklyThroughput;
 }
 
-/** Everything the deal workspace needs. Only the Brightside demo deal has full data. */
-export async function getDealWorkspace(id: string) {
+/**
+ * Everything the deal workspace needs. Of the seeded deals only Brightside has full data;
+ * prospects added during a demo are generated in the browser (see lib/data/generate.ts).
+ */
+export async function getDealWorkspace(id: string): Promise<DealWorkspaceData | null> {
   if (id !== "brightside") return null;
-  const { clientStatedTxns, ...data } = brightside;
-  return { ...data, clientStatedTxns };
+  return { ...brightside };
 }
-
-export type DealWorkspaceData = NonNullable<Awaited<ReturnType<typeof getDealWorkspace>>>;

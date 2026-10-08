@@ -271,3 +271,68 @@ export interface ApprovalEvent {
   action: "submitted" | "approved" | "changes_requested" | "sent";
   note?: string;
 }
+
+// ── Workspace bundle ────────────────────────────────────────────────────────
+
+export interface ActivityItem {
+  at: string;
+  label: string;
+  actor: string;
+  minutes?: number;
+}
+
+/** Everything the deal workspace needs (analysis, call, scope inputs). */
+export interface DealWorkspaceData {
+  volumes: MonthlyVolume[];
+  snapshot: Snapshot;
+  signals: SignalValue[];
+  findings: Finding[];
+  briefSummary: string;
+  briefQuestions: BriefQuestion[];
+  meeting: Meeting;
+  transcript: TranscriptSegment[];
+  requirements: Requirement[];
+  briefAnswers: BriefAnswer[];
+  contradictions: Contradiction[];
+  openItems: string[];
+  questionnaire: { q: string; a: string }[];
+  workloadDrivers: WorkloadDrivers;
+  /** The client's own volume estimate, used if the analyst resolves the contradiction in their favour. */
+  clientStatedTxns: number;
+  cleanupDrivers: CleanupDrivers;
+  scope: ScopeLine[];
+  activity: ActivityItem[];
+  recommendedPackage: PackageId;
+  payrollProvider: string | null;
+  confidence: { level: Confidence; reasons: string[] };
+  /** Proposal copy for the cleanup project, e.g. "Bring the books current…". */
+  cleanup: { summary: string; deadline: string };
+}
+
+// ── Prospects added during a demo (stored in the browser) ───────────────────
+
+export type DemoSize = "small" | "medium" | "large";
+export type DemoCondition = "clean" | "behind" | "messy";
+
+export interface CustomDealProgress {
+  connectedAt?: string;
+  connectedBy?: string;
+  analysedAt?: string;
+  callStartedAt?: string;
+  callPlatform?: MeetingPlatform;
+  transcriptAt?: string;
+}
+
+export interface CustomDeal {
+  id: string;
+  createdAt: string;
+  ownerId: string;
+  prospect: Prospect;
+  system: LedgerSystem;
+  accessPath: AccessPath;
+  notes: string;
+  /** Shape of the simulated ledger, chosen on the intake form. */
+  profile: { size: DemoSize; condition: DemoCondition; clientEstimate: number | null };
+  progress: CustomDealProgress;
+  portalAnswers?: { q: string; a: string }[];
+}

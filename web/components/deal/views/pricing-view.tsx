@@ -19,7 +19,7 @@ import { priceRate, type PackageQuote } from "@/lib/engine/pricing";
 import { hrs, pct, ROLE_LABEL, usd } from "@/lib/format";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
-import type { OverrideReason, PackageId } from "@/lib/types";
+import type { CleanupDrivers, OverrideReason, PackageId } from "@/lib/types";
 
 const REASONS: Record<OverrideReason, string> = {
   competitive: "Competitive pressure",
@@ -188,11 +188,13 @@ export function PricingView() {
           <Card>
             <CardHeader>
               <CardTitle>One-time cleanup</CardTitle>
-              <CardDescription>7 months unreconciled, $18k in suspense, 1 month of catch-up.</CardDescription>
+              <CardDescription>{cleanupSummary(ws.data.cleanupDrivers)}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="num text-2xl font-semibold">{usd(cleanup.fee)}</div>
-              <div className="text-xs text-muted-foreground">{hrs(cleanup.hours)} · 50% upfront, 50% on completion</div>
+              <div className="num text-2xl font-semibold">{cleanup.fee > 0 ? usd(cleanup.fee) : "Not needed"}</div>
+              <div className="text-xs text-muted-foreground">
+                {cleanup.fee > 0 ? `${hrs(cleanup.hours)} · 50% upfront, 50% on completion` : "Books are current; monthly service starts straight away"}
+              </div>
             </CardContent>
           </Card>
 
@@ -412,4 +414,13 @@ function BreakdownTable({ quote, packageId }: { quote: PackageQuote; packageId: 
       </Table>
     </div>
   );
+}
+
+function cleanupSummary(c: CleanupDrivers) {
+  const parts = [
+    c.unreconciledAccountMonths ? `${c.unreconciledAccountMonths} account-months unreconciled` : null,
+    c.uncategorizedTxns ? `${c.uncategorizedTxns} suspense items` : null,
+    c.backlogMonths ? `${c.backlogMonths} month${c.backlogMonths > 1 ? "s" : ""} of catch-up` : null,
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(", ")}.` : "Reconciliations are current and suspense accounts are clear.";
 }

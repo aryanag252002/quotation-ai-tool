@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { PortalView } from "@/components/portal/portal-view";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getDeal, getTenant } from "@/lib/data";
 
 export const metadata: Metadata = { title: "Secure data connection" };
@@ -9,9 +11,10 @@ export async function generateStaticParams() {
   return [{ token: "brightside-demo" }];
 }
 
-// The token → deal lookup (expiring magic link) happens server-side in production; the demo maps every token to Brightside.
-export default async function PortalPage() {
-  const [tenant, deal] = await Promise.all([getTenant(), getDeal("brightside")]);
+// In production the token is an expiring magic link resolved server-side. In the demo,
+// "brightside-demo" maps to Brightside and any other token is a prospect added in this browser.
+export default async function PortalPage({ params }: PageProps<"/portal/[token]">) {
+  const tenant = await getTenant();
   return (
     <div className="min-h-svh bg-background">
       <header className="border-b bg-card">
@@ -26,7 +29,12 @@ export default async function PortalPage() {
         </div>
       </header>
       <main className="px-4 py-10">
-        <PortalView prospect={deal?.prospect.name ?? "your company"} kpo={tenant.shortName} />
+        <Suspense fallback={<Skeleton className="mx-auto h-96 max-w-3xl" />}>
+          {params.then(async ({ token }) => {
+            const seeded = token === "brightside-demo" ? await getDeal("brightside") : undefined;
+            return <PortalView token={token} prospect={seeded?.prospect.name ?? null} kpo={tenant.shortName} />;
+          })}
+        </Suspense>
       </main>
     </div>
   );

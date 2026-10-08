@@ -37,6 +37,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePricingConfig } from "@/lib/config/pricing-config-context";
+import { deals as seedDeals } from "@/lib/data/mock/pipeline";
+import { useCustomDeals } from "@/lib/state/custom-deals";
 import { ROLE_LABEL } from "@/lib/format";
 import type { UserRole } from "@/lib/types";
 
@@ -48,7 +50,7 @@ const DEMO_USERS: Record<UserRole, { name: string; initials: string }> = {
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/deals", label: "Quotes pipeline", icon: FileStack, badge: "10" },
+  { href: "/deals", label: "Quotes pipeline", icon: FileStack, badge: true },
   { href: "/deals/new", label: "New prospect", icon: PlusCircle },
 ];
 
@@ -62,6 +64,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { role, setRole } = usePricingConfig();
   const user = DEMO_USERS[role];
+  const quoteCount = seedDeals.length + useCustomDeals().length;
 
   const isActive = (href: string) => {
     const path = href.split("?")[0];
@@ -102,7 +105,7 @@ export function AppSidebar() {
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
-                  {item.badge ? <SidebarMenuBadge className="num">{item.badge}</SidebarMenuBadge> : null}
+                  {item.badge ? <SidebarMenuBadge className="num">{quoteCount}</SidebarMenuBadge> : null}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

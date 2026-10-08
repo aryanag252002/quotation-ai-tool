@@ -1,4 +1,4 @@
-import type { DealStage, LedgerSystem, MeetingPlatform, UserRole } from "@/lib/types";
+import type { DealStage, Industry, LedgerSystem, MeetingPlatform, UserRole } from "@/lib/types";
 
 const usdFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2Fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
@@ -48,6 +48,22 @@ export const SYSTEM_LABEL: Record<LedgerSystem, string> = {
   netsuite: "NetSuite",
   upload: "File upload",
 };
+
+export const INDUSTRY_LABEL: Record<Industry, string> = {
+  ecommerce: "E-commerce / retail",
+  construction: "Construction / trades",
+  nonprofit: "Non-profit",
+  professional_services: "Professional services",
+  healthcare: "Healthcare",
+  real_estate: "Real estate",
+  logistics: "Logistics",
+  other: "Other",
+};
+
+export function monthName(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+}
 
 export const PLATFORM_LABEL: Record<MeetingPlatform, string> = {
   zoom: "Zoom",
