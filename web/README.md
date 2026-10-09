@@ -21,6 +21,7 @@ pnpm build
 | `lib/data/generate.ts` | Simulated ledger, analysis inputs and call transcript for prospects added in the demo (deterministic per prospect) |
 | `lib/engine/analysis.ts` | Decision A: signal definitions, RAG thresholds, complexity tier, books-health score, volume sizing |
 | `lib/engine/pricing.ts` | Decision B: deterministic pricing, cleanup and approval routing (pure functions, unit-tested) |
+| `lib/engine/savings.ts` | Savings vs what the prospect pays today (per package, annual, cleanup payback; unit-tested) |
 | `lib/config/defaults.ts` | Default pricing configuration (catalog, time standards, rates, packages, approval rules) |
 | `lib/state/` | Deal workspace state (scope, overrides, approval), demo prospects (`custom-deals.ts`) and a localStorage-backed store |
 | `components/deal/step-gate.tsx` | For demo prospects: waits for books access, runs the analysis, simulates the transcript arriving |

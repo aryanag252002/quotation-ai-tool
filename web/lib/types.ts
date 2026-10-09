@@ -136,8 +136,12 @@ export interface SignalValue {
   available: boolean;
 }
 
+/** Which financial statement a finding belongs to. */
+export type Statement = "pl" | "bs";
+
 export interface Finding {
   id: string;
+  statement: Statement;
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -150,6 +154,36 @@ export interface BriefQuestion {
   question: string;
   why: string;
   signalId?: string;
+}
+
+/** Headline figure from a financial statement, as reported in the prospect's books. */
+export interface StatementFigure {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "danger" | "warning";
+}
+
+export interface Financials {
+  /** Profit & loss, trailing 12 months. */
+  pl: { period: string; figures: StatementFigure[] };
+  /** Balance sheet at the latest month-end. */
+  bs: { asOf: string; figures: StatementFigure[] };
+  /** Shown when the books are not reconciled, so figures may move after cleanup. */
+  caveat: string | null;
+}
+
+/** What the prospect pays for bookkeeping today, so the proposal can show savings. */
+export interface CurrentProvider {
+  name: string;
+  monthlyFee: number;
+  /** Service ids the current provider covers (for "what you get that you don't today"). */
+  services: string[];
+  /** Where the figure came from first. */
+  source: "ledger" | "call" | "portal";
+  evidence: string;
+  /** Transcript segments where the client confirmed it. */
+  segmentIds?: string[];
 }
 
 // ── Meeting & transcript ────────────────────────────────────────────────────
@@ -287,6 +321,8 @@ export interface DealWorkspaceData {
   snapshot: Snapshot;
   signals: SignalValue[];
   findings: Finding[];
+  financials: Financials;
+  currentProvider: CurrentProvider | null;
   briefSummary: string;
   briefQuestions: BriefQuestion[];
   meeting: Meeting;

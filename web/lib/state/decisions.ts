@@ -18,6 +18,10 @@ export interface DecisionState {
   overrideReason: OverrideReason | null;
   overrideNote: string;
   protection: "true_up" | "contingency";
+  /** Analyst correction of what the prospect pays today (null = use the figure found). */
+  currentFeeOverride: number | null;
+  /** Include the savings comparison in the proposal. */
+  showSavings: boolean;
   status: QuoteStatus;
   /** Fee and cleanup at submission; approval is void if either changes. */
   submittedQuote: { fee: number; cleanup: number } | null;

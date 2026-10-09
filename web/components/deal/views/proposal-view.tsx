@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AiBadge, Pill } from "@/components/app/status";
 import { buildAssumptions } from "@/components/deal/assumptions";
 import { shortName } from "@/lib/data/generate";
+import { tenant } from "@/lib/data/mock/pipeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -173,6 +174,10 @@ function ProposalDocument() {
     config.packages.some((p) => ws.quotes[p.id].services.some((x) => x.service.id === s.id)),
   );
   const issued = ws.custom ? (ws.events.at(-1)?.at ?? ws.custom.progress.transcriptAt ?? ws.custom.createdAt) : "2026-10-08T00:00:00Z";
+  const savings = ws.showSavings ? ws.savings : null;
+  const provider = data.currentProvider;
+  let n = 0;
+  const next = () => ++n;
   const recServices = ws.quotes[rec.id].services
     .filter((x) => !["bookkeeping", "reconciliation", "basic_financials"].includes(x.service.id))
     .map((x) => x.service.name.toLowerCase());
@@ -184,7 +189,7 @@ function ProposalDocument() {
             <div className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Proposal</div>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight">Accounting services for {deal.prospect.name}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Prepared by Northstar Accounting Services for {deal.prospect.contactName}, {deal.prospect.contactTitle}
+              Prepared by {tenant.name} for {deal.prospect.contactName}, {deal.prospect.contactTitle}
             </p>
           </div>
           <div className="text-sm sm:text-right">
@@ -196,7 +201,7 @@ function ProposalDocument() {
           </div>
         </header>
 
-        <Section n={1} title="Our understanding of your business">
+        <Section n={next()} title="Our understanding of your business">
           <p className="text-sm leading-relaxed">{data.briefSummary}</p>
           <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
             {data.requirements.slice(0, 6).map((r) => (
@@ -207,17 +212,39 @@ function ProposalDocument() {
           </ul>
         </Section>
 
-        <Section n={2} title="What we found in your books">
-          <ul className="space-y-2 text-sm">
-            {findings.map((f) => (
-              <li key={f.id}>
-                <span className="font-medium">{f.title}.</span> <span className="text-muted-foreground">{f.detail}</span>
-              </li>
-            ))}
-          </ul>
+        <Section n={next()} title="What we found in your books">
+          {data.financials.caveat ? <p className="text-xs text-muted-foreground">{data.financials.caveat}</p> : null}
+          <div className="space-y-4">
+            {(["pl", "bs"] as const).map((st) => {
+              const items = findings.filter((f) => f.statement === st);
+              const fin = data.financials[st];
+              return (
+                <div key={st} className="space-y-1.5">
+                  <h4 className="text-sm font-semibold">
+                    {st === "pl" ? "Profit & loss" : "Balance sheet"}{" "}
+                    <span className="font-normal text-muted-foreground">({"period" in fin ? fin.period : `as of ${fin.asOf}`})</span>
+                  </h4>
+                  <p className="num text-xs text-muted-foreground">
+                    {fin.figures.map((f) => `${f.label} ${f.value}`).join(" · ")}
+                  </p>
+                  {items.length ? (
+                    <ul className="list-disc space-y-1.5 pl-4 text-sm">
+                      {items.map((f) => (
+                        <li key={f.id}>
+                          <span className="font-medium">{f.title}.</span> <span className="text-muted-foreground">{f.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No issues found.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </Section>
 
-        <Section n={3} title="Packages">
+        <Section n={next()} title="Packages">
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -261,6 +288,19 @@ function ProposalDocument() {
                     </TableCell>
                   ))}
                 </TableRow>
+                {savings ? (
+                  <TableRow>
+                    <TableCell>Saving vs. today ({usd(savings.current)}/mo)</TableCell>
+                    {config.packages.map((p) => {
+                      const v = savings.perPackage[p.id];
+                      return (
+                        <TableCell key={p.id} className={cn("num text-center", p.id === rec.id && "bg-accent/50", v > 0 ? "font-medium text-success" : "text-muted-foreground")}>
+                          {v > 0 ? usd(v) : v < 0 ? `+${usd(-v)}` : "—"}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </div>
@@ -271,7 +311,68 @@ function ProposalDocument() {
           </p>
         </Section>
 
-        <Section n={4} title="One-time cleanup project">
+        {savings && provider ? (
+          <Section n={next()} title={savings.monthly > 0 ? "What you save" : "Compared with today"}>
+            {savings.monthly > 0 ? (
+              <dl className="grid grid-cols-3 divide-x divide-success/20 rounded-lg bg-success-soft py-3 ring-1 ring-success/20">
+                <div className="px-4">
+                  <dt className="text-xs text-muted-foreground">You save each month</dt>
+                  <dd className="num text-2xl font-semibold tracking-tight text-success">{usd(savings.monthly)}</dd>
+                  <dd className="text-xs text-muted-foreground">{Math.round(savings.pct * 100)}% less than today</dd>
+                </div>
+                <div className="px-4">
+                  <dt className="text-xs text-muted-foreground">Each year</dt>
+                  <dd className="num text-2xl font-semibold tracking-tight text-success">{usd(savings.annual)}</dd>
+                </div>
+                <div className="px-4">
+                  <dt className="text-xs text-muted-foreground">Cleanup paid back in</dt>
+                  <dd className="num text-2xl font-semibold tracking-tight">{savings.paybackMonths ? `${savings.paybackMonths} mo` : "—"}</dd>
+                  <dd className="text-xs text-muted-foreground">{savings.paybackMonths ? "from savings alone" : "No cleanup needed"}</dd>
+                </div>
+              </dl>
+            ) : null}
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead />
+                    <TableHead className="text-center">Today ({provider.name})</TableHead>
+                    <TableHead className="bg-accent text-center text-accent-foreground">{rec.name} with {tenant.shortName}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="font-semibold">
+                    <TableCell>Monthly fee</TableCell>
+                    <TableCell className="num text-center">{usd(savings.current)}</TableCell>
+                    <TableCell className="num bg-accent/50 text-center">{usd(savings.ours)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Bookkeeping, reconciliations and monthly statements</TableCell>
+                    <TableCell className="text-center"><Check className="mx-auto size-4 text-success" aria-label="Included" /></TableCell>
+                    <TableCell className="bg-accent/50 text-center"><Check className="mx-auto size-4 text-success" aria-label="Included" /></TableCell>
+                  </TableRow>
+                  {savings.added.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>{a.name}</TableCell>
+                      <TableCell className="text-center text-muted-foreground"><span aria-label="Not included">—</span></TableCell>
+                      <TableCell className="bg-accent/50 text-center"><Check className="mx-auto size-4 text-success" aria-label="Included" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-sm">
+              {savings.monthly > 0
+                ? `Switching saves ${usd(savings.monthly)} a month (${usd(savings.annual)} a year)${savings.added.length ? ` while adding ${listJoin(savings.added.map((a) => a.name.toLowerCase()))}` : ""}.`
+                : `For ${usd(-savings.monthly)} more a month, you also get ${savings.added.length ? listJoin(savings.added.map((a) => a.name.toLowerCase())) : "a faster monthly close"}.`}
+              {savings.monthly > 0 && savings.paybackMonths
+                ? ` The one-time cleanup is covered by your savings within ${savings.paybackMonths} month${savings.paybackMonths > 1 ? "s" : ""}.`
+                : ""}
+            </p>
+          </Section>
+        ) : null}
+
+        <Section n={next()} title="One-time cleanup project">
           {ws.cleanup.fee > 0 ? (
             <>
               <p className="text-sm">
@@ -286,7 +387,7 @@ function ProposalDocument() {
           )}
         </Section>
 
-        <Section n={5} title="Onboarding timeline">
+        <Section n={next()} title="Onboarding timeline">
           <ol className="grid gap-2 text-sm sm:grid-cols-4">
             {["Week 1: access, kickoff, document request", "Weeks 1–3: cleanup and catch-up", "Week 3: first reconciliations and AP handover", "Week 4: first monthly close"].map((s) => (
               <li key={s} className="rounded-md border p-2.5">{s}</li>
@@ -294,7 +395,7 @@ function ProposalDocument() {
           </ol>
         </Section>
 
-        <Section n={6} title="Assumptions">
+        <Section n={next()} title="Assumptions">
           <ul className="list-disc space-y-1 pl-4 text-sm">
             {buildAssumptions(ws.drivers, ws.scopeIncluded, { clientName: shortName(deal.prospect.name), payrollProvider: data.payrollProvider }).map((a) => (
               <li key={a}>{a}</li>
@@ -303,7 +404,7 @@ function ProposalDocument() {
           </ul>
         </Section>
 
-        <Section n={7} title="What we need from you">
+        <Section n={next()} title="What we need from you">
           <ul className="list-disc space-y-1 pl-4 text-sm">
             {data.openItems.map((o) => (
               <li key={o}>{o}</li>
@@ -311,7 +412,7 @@ function ProposalDocument() {
           </ul>
         </Section>
 
-        <Section n={8} title="Terms">
+        <Section n={next()} title="Terms">
           <p className="text-sm text-muted-foreground">
             Monthly fees billed in advance, net 15. 12-month term with 30 days’ notice. Prices reviewed annually.
             All amounts in {config.currency}.
@@ -325,7 +426,7 @@ function ProposalDocument() {
           </div>
           <div>
             <div className="h-10 border-b" />
-            <div className="mt-1 text-muted-foreground">Northstar Accounting Services</div>
+            <div className="mt-1 text-muted-foreground">{tenant.name}</div>
           </div>
         </footer>
       </CardContent>

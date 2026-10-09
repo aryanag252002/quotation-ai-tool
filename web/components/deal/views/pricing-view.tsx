@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Info, ShieldAlert, ShieldCheck, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { ConfidenceBadge, Pill } from "@/components/app/status";
+import { SavingsCard } from "@/components/deal/savings-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,15 @@ export function PricingView() {
                   {isRec && overridden ? (
                     <div className="num text-xs text-muted-foreground line-through">{usd(engineFee)} engine</div>
                   ) : null}
+                  {ws.savings ? (
+                    <div className={cn("num mt-1 text-xs font-medium", ws.savings.perPackage[p.id] > 0 ? "text-success" : "text-muted-foreground")}>
+                      {ws.savings.perPackage[p.id] > 0
+                        ? `Saves ${usd(ws.savings.perPackage[p.id])}/mo vs today`
+                        : ws.savings.perPackage[p.id] < 0
+                          ? `${usd(-ws.savings.perPackage[p.id])}/mo more than today`
+                          : "Same as today"}
+                    </div>
+                  ) : null}
                 </div>
                 <dl className="grid grid-cols-3 gap-2 text-xs">
                   <div>
@@ -128,6 +138,8 @@ export function PricingView() {
           );
         })}
       </div>
+
+      <SavingsCard />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">

@@ -8,7 +8,9 @@ import type {
   BriefQuestion,
   CleanupDrivers,
   Contradiction,
+  CurrentProvider,
   Finding,
+  Financials,
   Meeting,
   MonthlyVolume,
   Requirement,
@@ -135,14 +137,51 @@ export const signals: SignalValue[] = [
 ];
 
 export const findings: Finding[] = [
-  { id: "f1", severity: "high", title: "Books not reconciled since February 2026", detail: "All 5 bank and card accounts were last reconciled on 28 Feb 2026, leaving 7 months (~4,410 transactions) unreconciled. This drives most of the cleanup project.", signalIds: ["Q1", "B1"], status: "proposed" },
-  { id: "f2", severity: "high", title: "$18,420 in Uncategorized / Ask My Accountant", detail: "212 transactions (2.1% of operating expenses) sit in suspense-type accounts, above the 1% threshold.", signalIds: ["Q3"], status: "proposed" },
-  { id: "f3", severity: "medium", title: "Two payment processors need clearing reconciliation", detail: "Shopify Payments and Stripe payouts, fees and refunds flow through clearing accounts that are not reconciled.", signalIds: ["S6"], status: "proposed" },
-  { id: "f4", severity: "medium", title: "Subscription revenue is deferred manually", detail: "A $9,870 deferred revenue balance is maintained with a monthly manual journal entry.", signalIds: ["S7", "V9"], status: "proposed" },
-  { id: "f5", severity: "medium", title: "38 undeposited-funds items older than 30 days", detail: "$14,960 of customer receipts were never matched to deposits.", signalIds: ["Q4"], status: "proposed" },
-  { id: "f6", severity: "low", title: "Opening Balance Equity holds $6,215", detail: "Usually caused by opening balances entered without an offset; needs a one-off correction.", signalIds: ["Q5"], status: "proposed" },
-  { id: "f7", severity: "low", title: "Volume grew year on year", detail: "Transaction volume is up year on year. The quote includes a volume-band clause.", signalIds: ["V13"], status: "proposed" },
+  // Profit & loss
+  { id: "f2", statement: "pl", severity: "high", title: "$18,420 of expenses in Uncategorized / Ask My Accountant", detail: "212 transactions (2.1% of operating expenses) sit in suspense-type accounts, above the 1% threshold, so expense lines on the P&L are understated.", signalIds: ["Q3"], status: "proposed" },
+  { id: "f8", statement: "pl", severity: "medium", title: "Gross margin swings because coffee is expensed when billed", detail: "There is no inventory in QuickBooks, so green coffee hits cost of goods sold when the importer bills, not when it is roasted and sold. Monthly gross margin moved between 52% and 63% this year.", signalIds: ["S4"], status: "proposed" },
+  { id: "f4", statement: "pl", severity: "medium", title: "Subscription revenue is recognised with a manual journal", detail: "Gift-subscription revenue is released from a $9,870 deferred revenue balance with one manual entry a month, built from a Shopify export.", signalIds: ["S7", "V9"], status: "proposed" },
+  { id: "f9", statement: "pl", severity: "low", title: "14 possible duplicate expenses", detail: "Same amount and payee within three days, mostly freight and packaging bills; each needs checking before the P&L is final.", signalIds: ["Q8"], status: "proposed" },
+  { id: "f7", statement: "pl", severity: "low", title: "Revenue grew 15% year on year", detail: "Transaction volume grew with it. The quote includes a volume-band clause so the fee only moves if volume keeps rising.", signalIds: ["V13"], status: "proposed" },
+  // Balance sheet
+  { id: "f1", statement: "bs", severity: "high", title: "Cash not reconciled since February 2026", detail: "All 5 bank and card accounts were last reconciled on 28 Feb 2026, leaving 7 months (~4,410 transactions) unreconciled. The $142k cash balance can’t be relied on until this is done.", signalIds: ["Q1", "B1"], status: "proposed" },
+  { id: "f3", statement: "bs", severity: "medium", title: "Shopify and Stripe clearing accounts are not reconciled", detail: "Payouts, fees and refunds flow through two clearing accounts that have never been reconciled to processor statements.", signalIds: ["S6"], status: "proposed" },
+  { id: "f5", statement: "bs", severity: "medium", title: "$14,960 in undeposited funds older than 30 days", detail: "38 customer receipts were never matched to bank deposits, so cash and receivables are both overstated.", signalIds: ["Q4"], status: "proposed" },
+  { id: "f10", statement: "bs", severity: "low", title: "18% of receivables are over 90 days", detail: "$11,940 of $66,330 AR is older than 90 days across 9 wholesale cafés. Some may need writing off.", signalIds: ["Q7"], status: "proposed" },
+  { id: "f6", statement: "bs", severity: "low", title: "Opening Balance Equity holds $6,215", detail: "Usually caused by opening balances entered without an offset; needs a one-off correction.", signalIds: ["Q5"], status: "proposed" },
 ];
+
+export const financials: Financials = {
+  pl: {
+    period: "12 months to September 2026",
+    figures: [
+      { label: "Revenue", value: "$1,742,000", hint: "+15% vs prior 12 months" },
+      { label: "Gross margin", value: "57.9%", hint: "COGS $734k · swings 52–63% a month", tone: "warning" },
+      { label: "Operating expenses", value: "$877,000", hint: "Incl. $18,420 uncategorized", tone: "danger" },
+      { label: "Net income", value: "$131,000", hint: "7.5% margin, as reported" },
+    ],
+  },
+  bs: {
+    asOf: "Sep 30, 2026",
+    figures: [
+      { label: "Cash & bank", value: "$142,380", hint: "Unreconciled since February 2026", tone: "danger" },
+      { label: "Accounts receivable", value: "$66,330", hint: "18% over 90 days", tone: "warning" },
+      { label: "Accounts payable", value: "$48,210", hint: "92 bills a month" },
+      { label: "Equity", value: "$214,560", hint: "Incl. $6,215 Opening Balance Equity", tone: "warning" },
+    ],
+  },
+  caveat: "As reported in QuickBooks. Nothing has been reconciled since February, so these figures will move once the cleanup is done.",
+};
+
+/** Found in the ledger (vendor payments), then confirmed on the call. */
+export const currentProvider: CurrentProvider = {
+  name: "Summit Bookkeeping Co.",
+  monthlyFee: 3200,
+  services: ["bookkeeping", "reconciliation", "basic_financials"],
+  source: "ledger",
+  evidence: "12 payments of $3,200 to Summit Bookkeeping Co. (Professional Fees: Bookkeeping), Mar 2025 – Feb 2026",
+  segmentIds: ["s26"],
+};
 
 export const briefSummary =
   "Brightside is a specialty coffee roaster selling wholesale to cafés (Stripe-invoiced) and direct to consumers through Shopify, including gift subscriptions. Books are on QuickBooks Online, accrual basis, with class tracking by channel. The ledger shows about 640 bank and card transactions a month with a holiday peak near 790. Bookkeeping has slipped: nothing has been reconciled since February 2026 and $18k sits in suspense accounts, so a cleanup project is needed before monthly service starts.";
@@ -155,15 +194,16 @@ export const briefQuestions: BriefQuestion[] = [
   { id: "b5", question: "Which payroll provider do you use, how often, and for how many employees?", why: "Paycheck detail not in the ledger.", signalId: "V8" },
   { id: "b6", question: "Which sales-tax returns do you file today, and who files them?", why: "WA and CA filings found.", signalId: "S5" },
   { id: "b7", question: "Do you track inventory anywhere outside QuickBooks?", why: "Roaster with no inventory in the books.", signalId: "S4" },
+  { id: "b9", question: "What did Summit Bookkeeping cover for $3,200 a month, and why did you stop?", why: "Ledger shows $3,200 a month to Summit Bookkeeping until Feb 2026; sets the savings comparison." },
   { id: "b8", question: "What reporting do investors or lenders expect, and by which day each month?", why: "Class tracking is set up by channel.", signalId: "S2" },
 ];
 
 export const meeting: Meeting = {
   platform: "zoom",
-  title: "Brightside × Northstar: discovery call",
+  title: "Brightside × Global Insights: discovery call",
   startedAt: "2026-10-07T17:00:00Z",
   durationMinutes: 38,
-  attendees: ["Priya Sharma (Northstar)", "Maya Chen (Brightside, CEO)", "Daniel Ortiz (Brightside, Operations)"],
+  attendees: ["Priya Sharma (Global Insights)", "Maya Chen (Brightside, CEO)", "Daniel Ortiz (Brightside, Operations)"],
   consentLogged: true,
   transcriptReceivedAt: "2026-10-07T17:41:00Z",
   extractionSeconds: 134,
@@ -171,7 +211,7 @@ export const meeting: Meeting = {
 
 export const transcript: TranscriptSegment[] = [
   { id: "s1", speaker: "Priya Sharma", side: "kpo", start: 0, text: "Thanks for joining. I’ve already had a look at your QuickBooks, so I’d like to use this time to confirm a few things and understand what you need from us." },
-  { id: "s2", speaker: "Maya Chen", side: "prospect", start: 41, text: "Great. Honestly, the books have slipped since our bookkeeper left in March. Daniel has kept things moving, but reconciliations haven’t been done." },
+  { id: "s2", speaker: "Maya Chen", side: "prospect", start: 41, text: "Great. Honestly, the books have slipped since we let our bookkeeping firm go in March. Daniel has kept things moving, but reconciliations haven’t been done." },
   { id: "s3", speaker: "Priya Sharma", side: "kpo", start: 80, text: "That matches what we saw. All five bank and card accounts were last reconciled in February. Is anything sitting in the bank feed that hasn’t been categorised yet?" },
   { id: "s4", speaker: "Daniel Ortiz", side: "prospect", start: 112, text: "Yes, September is basically untouched in the bank feed. Everything before that is categorised, though some of it went into Ask My Accountant." },
   { id: "s5", speaker: "Priya Sharma", side: "kpo", start: 150, text: "How many transactions would you say you have in a month?" },
@@ -193,7 +233,9 @@ export const transcript: TranscriptSegment[] = [
   { id: "s21", speaker: "Priya Sharma", side: "kpo", start: 690, text: "I don’t see any inventory in QuickBooks. Do you track it anywhere?" },
   { id: "s22", speaker: "Daniel Ortiz", side: "prospect", start: 702, text: "We track green coffee in a spreadsheet. We’d like proper inventory accounting next year, not right now." },
   { id: "s23", speaker: "Maya Chen", side: "prospect", start: 760, text: "Timing-wise, we’d like the books cleaned up before our investor update in December, and ideally the close done by the tenth of each month." },
-  { id: "s24", speaker: "Priya Sharma", side: "kpo", start: 810, text: "That’s really helpful. We’ll send a proposal with a cleanup project and a few package options by tomorrow." },
+  { id: "s25", speaker: "Priya Sharma", side: "kpo", start: 802, text: "One last thing. The ledger shows payments to Summit Bookkeeping until February. What did they cover for that?" },
+  { id: "s26", speaker: "Maya Chen", side: "prospect", start: 815, text: "Thirty-two hundred a month, and that was just bookkeeping and reconciliations. We still paid bills and filed sales tax ourselves, and they were always behind." },
+  { id: "s24", speaker: "Priya Sharma", side: "kpo", start: 862, text: "That’s really helpful. We’ll send a proposal with a cleanup project and a few package options by tomorrow." },
 ];
 
 export const requirements: Requirement[] = [
@@ -206,17 +248,19 @@ export const requirements: Requirement[] = [
   { id: "r7", field: "Payroll", value: "Gusto, semi-monthly, 18 employees; takeover optional, not urgent", confidence: "medium", segmentIds: ["s16", "s17"] },
   { id: "r8", field: "Inventory", value: "Tracked in a spreadsheet; inventory accounting wanted next year", confidence: "medium", segmentIds: ["s22"] },
   { id: "r9", field: "Bank-feed backlog", value: "September not categorised (1 month catch-up)", confidence: "high", segmentIds: ["s4"] },
+  { id: "r11", field: "Current spend", value: "$3,200 / month to Summit Bookkeeping (bookkeeping and reconciliations only)", confidence: "high", segmentIds: ["s26"] },
   { id: "r10", field: "Decision maker", value: "Maya Chen (CEO); Daniel Ortiz day-to-day contact", confidence: "medium", segmentIds: ["s2", "s13"] },
 ];
 
 export const briefAnswers: BriefAnswer[] = [
   { questionId: "b1", answer: "September is uncategorised in the bank feed.", segmentIds: ["s4"] },
-  { questionId: "b2", answer: "Bookkeeper left in March; Daniel has categorised but not reconciled.", segmentIds: ["s2", "s4"] },
+  { questionId: "b2", answer: "Bookkeeping firm let go in March; Daniel has categorised but not reconciled.", segmentIds: ["s2", "s4"] },
   { questionId: "b3", answer: "Manual month-end JE from a Shopify export (about half a day).", segmentIds: ["s10"] },
   { questionId: "b4", answer: "Stripe is wholesale only; no other processors.", segmentIds: ["s12"] },
   { questionId: "b5", answer: "Gusto, semi-monthly, 18 employees.", segmentIds: ["s17"] },
   { questionId: "b6", answer: "WA monthly, CA quarterly; filed by Daniel today.", segmentIds: ["s20"] },
   { questionId: "b7", answer: "Green coffee tracked in a spreadsheet.", segmentIds: ["s22"] },
+  { questionId: "b9", answer: "$3,200 a month for bookkeeping and reconciliations only; always behind.", segmentIds: ["s26"] },
   { questionId: "b8", answer: "Monthly investor pack by class, close by day 10.", segmentIds: ["s18", "s23"] },
 ];
 
@@ -241,7 +285,7 @@ export const openItems = [
 
 export const questionnaire = [
   { q: "What services are you looking for?", a: "Bookkeeping, bill pay, monthly reporting" },
-  { q: "What’s prompting the change?", a: "Our bookkeeper left in March and we’ve fallen behind." },
+  { q: "What’s prompting the change?", a: "We let our bookkeeping firm go in March and we’ve fallen behind." },
   { q: "Other tools you use", a: "Shopify, Stripe, Gusto, Bill.com (trial)" },
   { q: "Number of employees", a: "18" },
   { q: "Ideal start date", a: "As soon as possible, before December" },

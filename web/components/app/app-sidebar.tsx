@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePricingConfig } from "@/lib/config/pricing-config-context";
-import { deals as seedDeals } from "@/lib/data/mock/pipeline";
+import { deals as seedDeals, tenant } from "@/lib/data/mock/pipeline";
 import { useCustomDeals } from "@/lib/state/custom-deals";
 import { ROLE_LABEL } from "@/lib/format";
 import type { UserRole } from "@/lib/types";
@@ -84,7 +84,7 @@ export function AppSidebar() {
                 </span>
                 <span className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-sm font-semibold text-sidebar-accent-foreground">QuoteIQ</span>
-                  <span className="truncate text-xs">Northstar Accounting</span>
+                  <span className="truncate text-xs">{tenant.name}</span>
                 </span>
               </Link>
             </SidebarMenuButton>

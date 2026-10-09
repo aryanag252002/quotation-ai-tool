@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PRICING_CONFIG } from "@/lib/config/defaults";
-import { generateWorkspace, shortName } from "@/lib/data/generate";
+import { generateWorkspace, PORTAL_SPEND_QUESTION, shortName } from "@/lib/data/generate";
 import { rateSignals, SIGNALS } from "@/lib/engine/analysis";
 import { quoteCleanup, quotePackage, requiredServiceIds } from "@/lib/engine/pricing";
 import type { CustomDeal, DemoCondition, DemoSize, Industry, LedgerSystem } from "@/lib/types";
@@ -54,6 +54,15 @@ describe("generateWorkspace", () => {
           expect(g).toBeLessThanOrEqual(p);
           const cleanup = quoteCleanup(DEFAULT_PRICING_CONFIG, w.cleanupDrivers, w.workloadDrivers).fee;
           if (condition === "messy") expect(cleanup).toBeGreaterThan(0);
+          // findings are split by statement, with headline figures for both
+          expect(w.findings.every((f) => f.statement === "pl" || f.statement === "bs")).toBe(true);
+          expect(w.financials.pl.figures).toHaveLength(4);
+          expect(w.financials.bs.figures).toHaveLength(4);
+          expect(w.financials.caveat === null).toBe(condition === "clean");
+          // the previous provider costs more than the recommended package
+          const recFee = quotePackage(DEFAULT_PRICING_CONFIG, w.recommendedPackage, w.workloadDrivers, new Set([...inScope, ...requiredServiceIds(w.workloadDrivers)])).monthlyFee;
+          expect(w.currentProvider!.monthlyFee).toBeGreaterThan(recFee);
+          expect(w.currentProvider!.segmentIds!.every((id) => segs.has(id))).toBe(true);
         });
       }
 
@@ -82,5 +91,13 @@ describe("generateWorkspace", () => {
   it("shortens legal names", () => {
     expect(shortName("Acme Widgets LLC")).toBe("Acme Widgets");
     expect(shortName("Kestrel Logistics Inc.")).toBe("Kestrel Logistics");
+  });
+
+  it("uses the current spend the prospect gave in the portal", () => {
+    const d = { ...deal("construction", "small", "behind"), portalAnswers: [{ q: PORTAL_SPEND_QUESTION, a: "$1,800" }] };
+    const w = generateWorkspace(d);
+    expect(w.currentProvider?.monthlyFee).toBe(1800);
+    expect(w.currentProvider?.source).toBe("portal");
+    expect(w.transcript.some((t) => t.text.includes("$1,800 a month"))).toBe(true);
   });
 });

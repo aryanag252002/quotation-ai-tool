@@ -8,8 +8,8 @@ export const users: User[] = [
 ];
 
 export const tenant = {
-  name: "Northstar Accounting Services",
-  shortName: "Northstar",
+  name: "Global Insights KPO",
+  shortName: "Global Insights",
 };
 
 export const deals: Deal[] = [

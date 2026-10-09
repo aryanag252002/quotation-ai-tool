@@ -21,6 +21,7 @@ import {
   type MultiplierResult,
   type PackageQuote,
 } from "@/lib/engine/pricing";
+import { compareSavings, type Savings } from "@/lib/engine/savings";
 import type { ApprovalEvent, Confidence, CustomDeal, Deal, DealStage, PackageId, WorkloadDrivers } from "@/lib/types";
 
 export type { QuoteStatus } from "@/lib/state/decisions";
@@ -38,6 +39,8 @@ function initialDecisions(data: DealWorkspaceData, fresh: boolean): DecisionStat
     overrideReason: null,
     overrideNote: "",
     protection: "true_up",
+    currentFeeOverride: null,
+    showSavings: true,
     status: "draft",
     submittedQuote: null,
     events: [],
@@ -66,6 +69,8 @@ interface WorkspaceValue extends DecisionState {
   engineFee: number;
   finalFee: number;
   approval: ApprovalDecision;
+  /** Comparison with what the prospect pays today; null when unknown. */
+  savings: Savings | null;
   /** True when the quote changed after it was submitted or approved. */
   isStale: boolean;
   /** Pipeline stage implied by the quote's live status. */
@@ -156,6 +161,17 @@ export function DealWorkspaceProvider({
       cleanupFee: cleanup.fee,
       confidence,
     });
+    const provider = data.currentProvider;
+    const savings = provider
+      ? compareSavings({
+          current: state.currentFeeOverride ?? provider.monthlyFee,
+          quotes,
+          recommended: state.recommendedPackage,
+          finalFee,
+          cleanupFee: cleanup.fee,
+          coveredToday: provider.services,
+        })
+      : null;
     const pending = state.status === "submitted" || state.status === "approved";
     const isStale =
       pending &&
@@ -180,6 +196,7 @@ export function DealWorkspaceProvider({
       engineFee,
       finalFee,
       approval,
+      savings,
     };
   }, [config, data, state, deal, custom, milestones]);
 

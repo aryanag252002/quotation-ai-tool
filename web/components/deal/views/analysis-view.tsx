@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Activity, Check, Gauge, Layers, Wrench, X } from "lucide-react";
+import { Activity, Check, Gauge, Landmark, Layers, ReceiptText, TriangleAlert, Wrench, X } from "lucide-react";
 import { SectionTitle } from "@/components/app/page-header";
 import { StatCard } from "@/components/app/stat-card";
 import { AiBadge, Pill, RagBadge } from "@/components/app/status";
@@ -22,9 +22,15 @@ import {
 import { hrs, usd } from "@/lib/format";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
-import type { SignalGroup } from "@/lib/types";
+import type { Finding, SignalGroup, Statement } from "@/lib/types";
 
 const SEVERITY_TONE = { high: "danger", medium: "warning", low: "neutral" } as const;
+
+const STATEMENTS: Statement[] = ["pl", "bs"];
+const STATEMENT_META: Record<Statement, { title: string; icon: typeof ReceiptText; empty: string }> = {
+  pl: { title: "Profit & loss", icon: ReceiptText, empty: "No profit & loss issues found: income and expenses are categorised." },
+  bs: { title: "Balance sheet", icon: Landmark, empty: "No balance sheet issues found: accounts are reconciled and balances look right." },
+};
 
 export function AnalysisView() {
   const { data, cleanup, drivers, findingStatus, set } = useDealWorkspace();
@@ -34,7 +40,7 @@ export function AnalysisView() {
   const health = booksHealth(rated);
   const [openSignal, setOpenSignal] = useState<RatedSignal | null>(null);
 
-  const setFinding = (id: string, status: "accepted" | "rejected" | "proposed") =>
+  const setFinding = (id: string, status: Finding["status"]) =>
     set("findingStatus", { ...findingStatus, [id]: status });
 
   return (
@@ -75,57 +81,69 @@ export function AnalysisView() {
             Key findings <AiBadge label="AI explained" />
           </CardTitle>
           <CardDescription>
-            The AI explains signals in plain language. It never computes the numbers. Accept or reject each finding
-            before it can appear in the proposal.
+            Split by financial statement. The AI explains signals in plain language; it never computes the numbers.
+            Accept or reject each finding before it can appear in the proposal.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0">
-          <ul className="divide-y">
-            {data.findings.map((f) => {
-              const status = findingStatus[f.id];
-              return (
-                <li key={f.id} className={cn("flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start", status === "rejected" && "opacity-60")}>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill tone={SEVERITY_TONE[f.severity]}>{f.severity}</Pill>
-                      <span className={cn("text-sm font-medium", status === "rejected" && "line-through")}>{f.title}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{f.detail}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {f.signalIds.map((sid) => (
-                        <button
-                          key={sid}
-                          type="button"
-                          onClick={() => setOpenSignal(byId[sid])}
-                          className="num rounded border px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        <CardContent className="space-y-0 px-0">
+          {data.financials.caveat ? (
+            <p className="mx-4 mb-3 flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {data.financials.caveat}
+            </p>
+          ) : null}
+          {STATEMENTS.map((st) => {
+            const meta = STATEMENT_META[st];
+            const items = data.findings.filter((f) => f.statement === st);
+            const fin = data.financials[st];
+            return (
+              <section key={st} aria-labelledby={`stmt-${st}`} className="border-t">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-muted/40 px-4 py-2.5">
+                  <meta.icon className="size-4 text-muted-foreground" aria-hidden />
+                  <h3 id={`stmt-${st}`} className="text-sm font-semibold">
+                    {meta.title}
+                  </h3>
+                  <span className="text-xs text-muted-foreground">{"period" in fin ? fin.period : `As of ${fin.asOf}`}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {items.length} finding{items.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-2 gap-px border-y bg-border lg:grid-cols-4">
+                  {fin.figures.map((fig) => (
+                    <div key={fig.label} className="space-y-0.5 bg-card px-4 py-3">
+                      <dt className="text-xs text-muted-foreground">{fig.label}</dt>
+                      <dd className="num text-lg font-semibold tracking-tight">{fig.value}</dd>
+                      {fig.hint ? (
+                        <dd
+                          className={cn(
+                            "flex items-start gap-1 text-xs",
+                            fig.tone === "danger" ? "text-danger" : fig.tone === "warning" ? "text-warning" : "text-muted-foreground",
+                          )}
                         >
-                          {sid} · evidence
-                        </button>
-                      ))}
+                          {fig.tone ? <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden /> : null}
+                          {fig.hint}
+                        </dd>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    <Button
-                      size="sm"
-                      variant={status === "accepted" ? "default" : "outline"}
-                      aria-pressed={status === "accepted"}
-                      onClick={() => setFinding(f.id, status === "accepted" ? "proposed" : "accepted")}
-                    >
-                      <Check /> {status === "accepted" ? "Accepted" : "Accept"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={status === "rejected" ? "secondary" : "ghost"}
-                      aria-pressed={status === "rejected"}
-                      onClick={() => setFinding(f.id, status === "rejected" ? "proposed" : "rejected")}
-                    >
-                      <X /> {status === "rejected" ? "Rejected" : "Reject"}
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  ))}
+                </dl>
+                {items.length ? (
+                  <ul className="divide-y">
+                    {items.map((f) => (
+                      <FindingRow
+                        key={f.id}
+                        finding={f}
+                        status={findingStatus[f.id]}
+                        onStatus={(next) => setFinding(f.id, next)}
+                        onEvidence={(sid) => setOpenSignal(byId[sid])}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-4 py-4 text-sm text-muted-foreground">{meta.empty}</p>
+                )}
+              </section>
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -193,5 +211,59 @@ export function AnalysisView() {
 
       <SignalEvidenceSheet signal={openSignal} onOpenChange={(open) => !open && setOpenSignal(null)} />
     </div>
+  );
+}
+
+function FindingRow({
+  finding: f,
+  status,
+  onStatus,
+  onEvidence,
+}: {
+  finding: Finding;
+  status: Finding["status"] | undefined;
+  onStatus: (status: Finding["status"]) => void;
+  onEvidence: (signalId: string) => void;
+}) {
+  return (
+    <li className={cn("flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start", status === "rejected" && "opacity-60")}>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Pill tone={SEVERITY_TONE[f.severity]}>{f.severity}</Pill>
+          <span className={cn("text-sm font-medium", status === "rejected" && "line-through")}>{f.title}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">{f.detail}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {f.signalIds.map((sid) => (
+            <button
+              key={sid}
+              type="button"
+              onClick={() => onEvidence(sid)}
+              className="num rounded border px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {sid} · evidence
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-1.5">
+        <Button
+          size="sm"
+          variant={status === "accepted" ? "default" : "outline"}
+          aria-pressed={status === "accepted"}
+          onClick={() => onStatus(status === "accepted" ? "proposed" : "accepted")}
+        >
+          <Check /> {status === "accepted" ? "Accepted" : "Accept"}
+        </Button>
+        <Button
+          size="sm"
+          variant={status === "rejected" ? "secondary" : "ghost"}
+          aria-pressed={status === "rejected"}
+          onClick={() => onStatus(status === "rejected" ? "proposed" : "rejected")}
+        >
+          <X /> {status === "rejected" ? "Rejected" : "Reject"}
+        </Button>
+      </div>
+    </li>
   );
 }

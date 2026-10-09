@@ -29,6 +29,9 @@ pnpm build        # production build
 
 Suggested walkthrough: **Dashboard → Quotes pipeline → Brightside Coffee Roasters**, then follow the 7 steps
 (Data access → Analysis → Pre-call brief → Consultation → Scope → Pricing → Approval & proposal).
+Key findings are split into **Profit & loss** and **Balance sheet**, each with headline figures. Pricing compares
+the quote with what the prospect pays their current bookkeeper (found in the ledger, confirmed on the call) and the
+proposal shows the savings; the analyst can correct the figure or hide it.
 Open **Pricing & catalog** to change a time standard and watch the quote re-price. Use the user menu
 (bottom-left) to switch between Analyst / Manager / Partner when approving. **Reset demo** on the deal
 header restores the AI draft.

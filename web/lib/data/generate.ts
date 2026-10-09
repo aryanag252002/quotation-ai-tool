@@ -5,8 +5,10 @@
  * extractor. Here they are generated deterministically from the intake form (industry, size,
  * books condition), so every new prospect walks the same flow as Brightside with its own numbers.
  */
+import { DEFAULT_PRICING_CONFIG } from "@/lib/config/defaults";
 import { sizeVolume } from "@/lib/engine/analysis";
-import { int, monthLabel, monthName, PLATFORM_LABEL, SYSTEM_LABEL, usd } from "@/lib/format";
+import { quotePackage, requiredServiceIds } from "@/lib/engine/pricing";
+import { date, int, monthLabel, monthName, PLATFORM_LABEL, SYSTEM_LABEL, usd } from "@/lib/format";
 import { tenant, users } from "@/lib/data/mock/pipeline";
 import type {
   ActivityItem,
@@ -14,11 +16,13 @@ import type {
   BriefQuestion,
   CapabilityGap,
   Contradiction,
+  CurrentProvider,
   CustomDeal,
   DealWorkspaceData,
   DemoCondition,
   DemoSize,
   Finding,
+  Financials,
   Industry,
   LedgerSystem,
   PackageId,
@@ -65,6 +69,8 @@ const INDUSTRY: Record<Industry, {
   salesTax: { state: string; freq: "monthly" | "quarterly" }[];
   inventory: (s: DemoSize) => boolean;
   season: Season;
+  /** Typical gross margin; null where there is no cost of sales. */
+  grossMargin: number | null;
 }> = {
   ecommerce: {
     does: "sells products online and through retail partners",
@@ -74,6 +80,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [{ state: "WA", freq: "monthly" }, { state: "CA", freq: "quarterly" }, { state: "TX", freq: "quarterly" }],
     inventory: (s) => s === "large",
     season: { shape: [-0.3, -0.25, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.5, 1], strength: 0.35 },
+    grossMargin: 0.46,
   },
   construction: {
     does: "runs residential and commercial projects",
@@ -83,6 +90,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [{ state: "CO", freq: "monthly" }],
     inventory: () => false,
     season: { shape: [-0.4, -0.4, -0.1, 0.2, 0.4, 0.8, 1, 0.8, 0.4, 0.1, -0.2, -0.4], strength: 0.25 },
+    grossMargin: 0.24,
   },
   nonprofit: {
     does: "runs community programs funded by grants and donations",
@@ -92,6 +100,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [],
     inventory: () => false,
     season: { shape: [0, 0, 0, 0, 0, 0, -0.2, -0.2, 0, 0, 0.3, 1], strength: 0.4 },
+    grossMargin: null,
   },
   professional_services: {
     does: "delivers project and retainer work for business clients",
@@ -101,6 +110,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [],
     inventory: () => false,
     season: { shape: [0, 0, 0, 0, 0, 0, -0.4, -0.6, 0, 0, 0, -0.3], strength: 0.15 },
+    grossMargin: 0.62,
   },
   healthcare: {
     does: "runs outpatient clinics",
@@ -110,6 +120,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [],
     inventory: () => false,
     season: FLAT,
+    grossMargin: 0.58,
   },
   real_estate: {
     does: "manages residential and commercial properties",
@@ -119,6 +130,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [],
     inventory: () => false,
     season: FLAT,
+    grossMargin: 0.52,
   },
   logistics: {
     does: "moves freight for regional shippers",
@@ -128,6 +140,7 @@ const INDUSTRY: Record<Industry, {
     salesTax: [{ state: "TN", freq: "monthly" }],
     inventory: () => false,
     season: { shape: [-0.2, -0.2, 0, 0, 0, 0, 0, 0, 0.2, 0.5, 1, 0.6], strength: 0.2 },
+    grossMargin: 0.21,
   },
   other: {
     does: "serves local and regional customers",
@@ -137,10 +150,12 @@ const INDUSTRY: Record<Industry, {
     salesTax: [{ state: "CA", freq: "quarterly" }],
     inventory: () => false,
     season: FLAT,
+    grossMargin: 0.4,
   },
 };
 
 const PAYROLL_PROVIDERS = ["Gusto", "ADP", "Paychex", "Rippling"];
+const BOOKKEEPING_FIRMS = ["Pinecrest Bookkeeping", "Harborline Accounting", "Northgate Books & Tax", "Meridian Ledger Partners", "Bluestone Bookkeeping"];
 
 const EXTERNAL_ID_LABEL: Record<LedgerSystem, string> = {
   qbo: "Company ID (realmId)",
@@ -151,6 +166,9 @@ const EXTERNAL_ID_LABEL: Record<LedgerSystem, string> = {
   upload: "Files received",
 };
 export const externalIdLabel = (s: LedgerSystem) => EXTERNAL_ID_LABEL[s];
+
+/** Portal question whose answer, when numeric, replaces the ledger-derived current spend. */
+export const PORTAL_SPEND_QUESTION = "What do you pay for bookkeeping today (per month)?";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -280,6 +298,66 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   const feedVisible = system === "xero" || system === "zoho";
   const backlogMonths = C.backlog;
 
+  // ── Financial statements (as reported) ───────────────────────────────────
+  const gm = I.grossMargin;
+  const netMargin = (profile.condition === "messy" ? r.between(1, 6) : r.between(5, 13)) / 100;
+  const revenue = opexYear / ((gm ?? 1) - netMargin);
+  const cogs = gm ? revenue * (1 - gm) : 0;
+  const revGrowth = yoy + r.between(-3, 3);
+  const thousands = (n: number) => usd(Math.round(n / 1000) * 1000);
+  const [asOfY, asOfM] = asOf.split("-").map(Number);
+  const nonprofit = prospect.industry === "nonprofit";
+  const financials: Financials = {
+    pl: {
+      period: `12 months to ${monthName(asOf)}`,
+      figures: [
+        { label: nonprofit ? "Revenue & support" : "Revenue", value: thousands(revenue), hint: `${revGrowth >= 0 ? "+" : ""}${revGrowth}% vs prior 12 months` },
+        gm
+          ? { label: "Gross margin", value: `${(gm * 100).toFixed(1)}%`, hint: `Cost of sales ${thousands(cogs)}` }
+          : { label: "Gross margin", value: "n/a", hint: "No cost of sales" },
+        {
+          label: "Operating expenses",
+          value: thousands(opexYear),
+          hint: suspenseDollars ? `Incl. ${usd(suspenseDollars)} uncategorized` : "All categorised",
+          tone: C.suspensePct >= 1 ? "danger" : C.suspensePct > 0 ? "warning" : undefined,
+        },
+        { label: nonprofit ? "Change in net assets" : "Net income", value: thousands(revenue * netMargin), hint: `${(netMargin * 100).toFixed(1)}% margin, as reported` },
+      ],
+    },
+    bs: {
+      asOf: date(new Date(Date.UTC(asOfY, asOfM, 0)).toISOString()),
+      figures: [
+        {
+          label: "Cash & bank",
+          value: thousands((revenue * r.between(35, 95)) / 1000),
+          hint: C.behind > 1 ? `Unreconciled since ${monthName(lastRec)}` : "Reconciled to statements",
+          tone: C.behind > 3 ? "danger" : C.behind > 1 ? "warning" : undefined,
+        },
+        accrual
+          ? { label: "Accounts receivable", value: usd(arTotal), hint: `${C.staleArPct}% over 90 days`, tone: C.staleArPct > 25 ? "danger" : C.staleArPct >= 10 ? "warning" : undefined }
+          : { label: "Accounts receivable", value: "Not tracked", hint: "Cash basis" },
+        accrual
+          ? { label: "Accounts payable", value: thousands(((cogs + opexYear) / 12) * (0.3 + r.next() * 0.2)), hint: `${avg6(bills)} bills a month`, tone: C.staleApShare >= 0.2 ? "warning" : undefined }
+          : { label: "Accounts payable", value: "Not tracked", hint: "Cash basis" },
+        {
+          label: nonprofit ? "Net assets" : "Equity",
+          value: thousands((revenue * r.between(10, 22)) / 100),
+          hint: obe ? `Incl. ${usd(obe)} Opening Balance Equity` : "No Opening Balance Equity",
+          tone: obe ? "warning" : undefined,
+        },
+      ],
+    },
+    caveat:
+      C.behind > 1
+        ? `As reported in ${isUpload ? "the exports" : sysLabel}. Nothing has been reconciled since ${monthName(lastRec)}, so these figures will move once the cleanup is done.`
+        : null,
+  };
+
+  // Previous / current bookkeeping provider, found as vendor payments in the ledger
+  const firm = r.pick(BOOKKEEPING_FIRMS);
+  const firmStillPaid = profile.condition !== "messy";
+  const portalSpend = Number(deal.portalAnswers?.find((a) => a.q === PORTAL_SPEND_QUESTION)?.a.replace(/[^0-9.]/g, ""));
+
   // ── Snapshot ──────────────────────────────────────────────────────────────
   const connectedAt = progress.connectedAt ?? deal.createdAt;
   const analysedAt = progress.analysedAt ?? connectedAt;
@@ -392,20 +470,20 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   // ── Findings ──────────────────────────────────────────────────────────────
   const findings: Finding[] = [];
   const add = (f: Omit<Finding, "id" | "status">) => findings.push({ ...f, id: `f${findings.length + 1}`, status: "proposed" });
-  if (C.behind > 1) add({ severity: C.behind > 3 ? "high" : "medium", title: `Books not reconciled since ${monthName(lastRec)}`, detail: `All ${accounts} bank and card accounts were last reconciled in ${monthName(lastRec)}, leaving ${C.behind} months (~${int(sum(bankCard.slice(-C.behind)))} transactions) unreconciled.`, signalIds: ["Q1", "B1"] });
-  if (extraEntities) add({ severity: "high", title: "Two entities with intercompany activity", detail: "Due-to / due-from balances with a holding company mean consolidation and intercompany eliminations each month.", signalIds: ["S3"] });
-  if (C.suspensePct >= 1) add({ severity: "high", title: `${usd(suspenseDollars)} in Uncategorized / Ask My Accountant`, detail: `${suspenseTxns} transactions (${C.suspensePct}% of operating expenses) sit in suspense-type accounts, above the 1% threshold.`, signalIds: ["Q3"] });
-  else if (C.suspensePct > 0) add({ severity: "medium", title: `${usd(suspenseDollars)} in suspense accounts`, detail: `${suspenseTxns} transactions need recategorising.`, signalIds: ["Q3"] });
-  if (processors.length) add({ severity: "medium", title: `${processors.length === 1 ? "A payment processor needs" : `${processors.length} payment processors need`} clearing reconciliation`, detail: `${listJoin(processors)} payouts, fees and refunds flow through clearing accounts that must be reconciled monthly.`, signalIds: ["S6"] });
-  if (hasInventory) add({ severity: "medium", title: "Inventory is tracked in the books", detail: "Inventory asset and COGS need monthly true-ups against stock counts.", signalIds: ["S4"] });
-  if (deferred) add({ severity: "medium", title: "Deferred revenue is maintained manually", detail: `${deferred} is updated with a monthly manual journal entry.`, signalIds: ["S7", "V9"] });
-  if (C.staleArPct >= 10) add({ severity: C.staleArPct > 25 ? "medium" : "low", title: `${C.staleArPct}% of receivables are over 90 days`, detail: `${usd(arStale)} of ${usd(arTotal)} AR is older than 90 days.`, signalIds: ["Q7"] });
-  if (undeposited) add({ severity: undeposited > 20 ? "medium" : "low", title: `${undeposited} undeposited-funds items older than 30 days`, detail: "Customer receipts were never matched to bank deposits.", signalIds: ["Q4"] });
-  if (duplicates > 5) add({ severity: duplicates > 20 ? "medium" : "low", title: `${duplicates} possible duplicate transactions`, detail: "Same amount and payee within three days; each needs checking.", signalIds: ["Q8"] });
-  if (coaRag === "red") add({ severity: "low", title: `Chart of accounts has ${coa} accounts`, detail: "Many near-duplicate accounts; a restructure will make reporting reliable.", signalIds: ["Q10"] });
-  if (obe) add({ severity: "low", title: `Opening Balance Equity holds ${usd(obe)}`, detail: "Usually caused by opening balances entered without an offset; needs a one-off correction.", signalIds: ["Q5"] });
-  if (yoy > 10) add({ severity: "low", title: `Volume grew ${yoy}% year on year`, detail: "The quote includes a volume-band clause.", signalIds: ["V13"] });
-  if (profile.condition === "clean") add({ severity: "low", title: "Books are reconciled and current", detail: `Reconciliations are complete through ${monthName(asOf)} and suspense accounts are clear, so monthly service can start straight away.`, signalIds: ["Q1", "Q3"] });
+  if (C.behind > 1) add({ statement: "bs", severity: C.behind > 3 ? "high" : "medium", title: `Books not reconciled since ${monthName(lastRec)}`, detail: `All ${accounts} bank and card accounts were last reconciled in ${monthName(lastRec)}, leaving ${C.behind} months (~${int(sum(bankCard.slice(-C.behind)))} transactions) unreconciled.`, signalIds: ["Q1", "B1"] });
+  if (extraEntities) add({ statement: "bs", severity: "high", title: "Two entities with intercompany activity", detail: "Due-to / due-from balances with a holding company mean consolidation and intercompany eliminations each month.", signalIds: ["S3"] });
+  if (C.suspensePct >= 1) add({ statement: "pl", severity: "high", title: `${usd(suspenseDollars)} in Uncategorized / Ask My Accountant`, detail: `${suspenseTxns} transactions (${C.suspensePct}% of operating expenses) sit in suspense-type accounts, above the 1% threshold.`, signalIds: ["Q3"] });
+  else if (C.suspensePct > 0) add({ statement: "pl", severity: "medium", title: `${usd(suspenseDollars)} in suspense accounts`, detail: `${suspenseTxns} transactions need recategorising.`, signalIds: ["Q3"] });
+  if (processors.length) add({ statement: "bs", severity: "medium", title: `${processors.length === 1 ? "A payment processor needs" : `${processors.length} payment processors need`} clearing reconciliation`, detail: `${listJoin(processors)} payouts, fees and refunds flow through clearing accounts that must be reconciled monthly.`, signalIds: ["S6"] });
+  if (hasInventory) add({ statement: "bs", severity: "medium", title: "Inventory is tracked in the books", detail: "Inventory asset and COGS need monthly true-ups against stock counts.", signalIds: ["S4"] });
+  if (deferred) add({ statement: "pl", severity: "medium", title: "Deferred revenue is maintained manually", detail: `${deferred} is updated with a monthly manual journal entry.`, signalIds: ["S7", "V9"] });
+  if (C.staleArPct >= 10) add({ statement: "bs", severity: C.staleArPct > 25 ? "medium" : "low", title: `${C.staleArPct}% of receivables are over 90 days`, detail: `${usd(arStale)} of ${usd(arTotal)} AR is older than 90 days.`, signalIds: ["Q7"] });
+  if (undeposited) add({ statement: "bs", severity: undeposited > 20 ? "medium" : "low", title: `${undeposited} undeposited-funds items older than 30 days`, detail: "Customer receipts were never matched to bank deposits.", signalIds: ["Q4"] });
+  if (duplicates > 5) add({ statement: "pl", severity: duplicates > 20 ? "medium" : "low", title: `${duplicates} possible duplicate transactions`, detail: "Same amount and payee within three days; each needs checking.", signalIds: ["Q8"] });
+  if (coaRag === "red") add({ statement: "pl", severity: "low", title: `Chart of accounts has ${coa} accounts`, detail: "Many near-duplicate accounts; a restructure will make reporting reliable.", signalIds: ["Q10"] });
+  if (obe) add({ statement: "bs", severity: "low", title: `Opening Balance Equity holds ${usd(obe)}`, detail: "Usually caused by opening balances entered without an offset; needs a one-off correction.", signalIds: ["Q5"] });
+  if (yoy > 10) add({ statement: "pl", severity: "low", title: `Volume grew ${yoy}% year on year`, detail: "The quote includes a volume-band clause.", signalIds: ["V13"] });
+  if (profile.condition === "clean") add({ statement: "bs", severity: "low", title: "Books are reconciled and current", detail: `Reconciliations are complete through ${monthName(asOf)} and suspense accounts are clear, so monthly service can start straight away.`, signalIds: ["Q1", "Q3"] });
   const order = { high: 0, medium: 1, low: 2 };
   findings.sort((a, b) => order[a.severity] - order[b.severity]);
 
@@ -423,6 +501,7 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   if (!feedVisible) q("q_feed", "Is anything sitting in the bank feed (“For Review”) that hasn’t been categorised yet?", isUpload ? "Not visible in file exports." : `Not available via the ${sysLabel} API.`, "Q12");
   if (C.behind > 1) q("q_behind", `Who has been doing the books since ${monthName(lastRec)}, and are bank statements available for the months since?`, `Nothing reconciled for ${C.behind} months.`, "Q1");
   if (processors.length) q("q_proc", `Are ${listJoin(processors)} your only payment processors? Any others (PayPal, Square, Amazon)?`, `${processors.length} clearing account${processors.length > 1 ? "s" : ""} found.`, "S6");
+  q("q_fees", `What does ${firm} cover today, and what do you pay them each month?`, `Payments to ${firm} found in the ledger; sets the savings comparison.`);
   q("q_payroll", "Which payroll provider do you use, how often, and for how many employees?", "Paycheck detail is not in the ledger.", "V8");
   if (taxes.length) q("q_tax", "Which sales-tax returns do you file today, and who files them?", `${taxes.map((t) => t.state).join(" and ")} filings found.`, "S5");
   if (deferred) q("q_def", "How is deferred revenue calculated each month, and from which system?", "Manual journal entry each month.", "S7");
@@ -459,10 +538,10 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   kpo(`Thanks for joining. I’ve already been through your ${isUpload ? "exports" : sysLabel} data, so I’d like to use this time to confirm a few things and understand what you need from us.`);
   const sReason = client(
     profile.condition === "clean"
-      ? "Great. We’re growing quickly and want a proper finance function instead of doing the books ourselves at night."
+      ? `Great. ${firm} keeps the books tidy, but their fees keep going up as we grow and we want a proper monthly close.`
       : profile.condition === "behind"
-        ? "Great. Honestly, the books have slipped over the last few months; nobody has had time for reconciliations."
-        : "Great. To be honest, the books are a mess. Our last bookkeeper left and things have piled up since.",
+        ? `Great. Honestly, the books have slipped over the last few months; ${firm} hasn’t kept up with reconciliations.`
+        : `Great. To be honest, the books are a mess. We stopped using ${firm} in ${monthName(monthsBefore(asOf, C.behind - 1)).split(" ")[0]} and things have piled up since.`,
   );
 
   let sFeed: string;
@@ -559,7 +638,6 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   req("Close deadline", `Close complete by day ${closeDay}`, [sTiming]);
   if (needsCleanup) req("Cleanup deadline", "Books clean within about two months", [sTiming]);
   req("Decision maker", `${contact} (${prospect.contactTitle})`, [sReason], "medium");
-  kpo(`That’s really helpful. We’ll send a proposal with ${needsCleanup ? "a cleanup project and " : ""}a few package options by tomorrow.`);
 
   const contradictions: Contradiction[] = contradicts
     ? [{ id: "c1", topic: "Monthly transaction volume", clientSaid: `“Around ${int(estimate)}” a month`, dataShows: `${int(sizing.sized)} / month (sized)${seasonality > 1.15 ? `, peaking near ${int(peak)} in ${peakMonth}` : ""}`, segmentIds: [sEstimate], signalId: "V1", resolution: "data" }]
@@ -644,6 +722,33 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   const recommendedPackage: PackageId =
     wantsPayroll || wantsCollections || closeDay === 5 || dims.count > 1 ? "premium" : wantsAp || wantsMgmtReporting ? "growth" : "essential";
 
+  // ── Current spend (asked last on the call, compared with our fee on the Pricing step) ──
+  const required = new Set(requiredServiceIds(workloadDrivers));
+  const inScope = new Set(scope.filter((l) => l.included || required.has(l.serviceId)).map((l) => l.serviceId));
+  const ourFee = quotePackage(DEFAULT_PRICING_CONFIG, recommendedPackage, workloadDrivers, inScope).monthlyFee;
+  const ledgerFee = round50(ourFee * (1.2 + r.next() * 0.35));
+  const currentFee = portalSpend > 0 ? portalSpend : ledgerFee;
+  const firmServices = ["bookkeeping", "reconciliation", "basic_financials", ...(profile.condition === "clean" && accrual ? ["month_end_close"] : [])];
+  const lastPaid = firmStillPaid ? asOf : monthsBefore(asOf, C.behind);
+  kpo(`One last thing. The ledger shows payments to ${firm}${firmStillPaid ? "" : ` until ${monthName(lastPaid).split(" ")[0]}`}. What ${firmStillPaid ? "do they cover" : "did they cover"} for that?`);
+  const sFees = client(
+    `About ${usd(currentFee)} a month, and that’s just bookkeeping${profile.condition === "clean" ? ", reconciliations and the close" : " and reconciliations"}.${wantsAp ? " We still pay the bills ourselves." : ""}${taxes.length ? " We file sales tax ourselves too." : ""}`,
+  );
+  answer("q_fees", `${usd(currentFee)} a month to ${firm} for bookkeeping and reconciliations.`, [sFees]);
+  req("Current spend", `${usd(currentFee)} / month to ${firm}`, [sFees]);
+  const currentProvider: CurrentProvider = {
+    name: firm,
+    monthlyFee: currentFee,
+    services: firmServices,
+    source: portalSpend > 0 ? "portal" : "ledger",
+    evidence:
+      portalSpend > 0
+        ? `Stated in the prospect portal (${usd(portalSpend)} / month)`
+        : `12 payments of ${usd(ledgerFee)} to ${firm} (Professional Fees: Bookkeeping), ${monthName(monthsBefore(lastPaid, 11))} – ${monthName(lastPaid)}`,
+    segmentIds: [sFees],
+  };
+  kpo(`That’s really helpful. We’ll send a proposal with ${needsCleanup ? "a cleanup project and " : ""}a few package options by tomorrow.`);
+
   // ── Confidence, questionnaire, activity ───────────────────────────────────
   const reasons = [
     ...(isUpload ? ["Analysis is from file exports only, with no live connection"] : []),
@@ -709,6 +814,8 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
     },
     signals,
     findings,
+    financials,
+    currentProvider,
     briefSummary,
     briefQuestions,
     meeting: {

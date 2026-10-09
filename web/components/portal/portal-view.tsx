@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useHydrated } from "@/hooks/use-hydrated";
+import { PORTAL_SPEND_QUESTION } from "@/lib/data/generate";
 import { updateCustomDeal, useCustomDeal } from "@/lib/state/custom-deals";
 import type { LedgerSystem } from "@/lib/types";
 import { Check, CheckCircle2, Clock, FileUp, Loader2, Lock, ShieldCheck, Trash2, Undo2 } from "lucide-react";
@@ -23,11 +24,12 @@ const SYSTEMS: { id: LedgerSystem; label: string }[] = [
 
 const QUESTIONS = [
   ["services", "What services are you looking for?", "e.g. bookkeeping, bill pay, payroll"],
-  ["why", "What’s prompting the change?", ""],
   ["tools", "Other tools you use", "e.g. Shopify, Stripe, Gusto"],
+  ["why", "What’s prompting the change?", ""],
   ["employees", "Number of employees", ""],
   ["start", "Ideal start date", ""],
   ["budget", "Monthly budget range", ""],
+  ["spend", PORTAL_SPEND_QUESTION, "e.g. $2,500 (optional)"],
 ] as const;
 const STEPS = ["Connect your books", "A few questions", "Review & submit"];
 
