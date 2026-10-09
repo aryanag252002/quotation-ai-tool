@@ -9,24 +9,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  CalendarClock,
   CheckCircle2,
   Circle,
   Copy,
   ExternalLink,
-  FileText,
   Loader2,
   PlugZap,
   Sparkles,
-  Video,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Pill } from "@/components/app/status";
+import { ConsultationControl } from "@/components/deal/consultation-control";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { tenant } from "@/lib/data/mock/pipeline";
-import { dateTime, PLATFORM_LABEL, SYSTEM_LABEL } from "@/lib/format";
+import { dateTime, SYSTEM_LABEL } from "@/lib/format";
 import { updateProgress } from "@/lib/state/custom-deals";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
@@ -39,7 +36,7 @@ export function StepGate({ step, children }: { step: Step; children: React.React
   if (!m.connected) return <AwaitingData />;
   if (!m.analysed) return <Analysing />;
   if (step === "data" || step === "analysis" || step === "requests" || step === "brief") return children;
-  if (!m.callHeld) return step === "meeting" ? <CallPending /> : <NeedsCall step={step} />;
+  if (!m.callHeld) return step === "meeting" ? <ConsultationControl /> : <NeedsCall step={step} />;
   return children;
 }
 
@@ -236,109 +233,7 @@ function Analysing() {
   );
 }
 
-// ── 3. Consultation ─────────────────────────────────────────────────────────
-
-const WEBHOOK = {
-  zoom: "Zoom recording.transcript_completed webhook",
-  teams: "Microsoft Graph transcript notification",
-  meet: "Google Workspace Events notification",
-} as const;
-
-function CallPending() {
-  const { deal, data, scheduledCall, briefReviewed } = useDealWorkspace();
-  const [stage, setStage] = useState(-1);
-
-  if (!scheduledCall) {
-    return (
-      <Card className="mx-auto max-w-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="size-4" aria-hidden /> Consultation not scheduled yet
-          </CardTitle>
-          <CardDescription>
-            Schedule it from the pre-call brief. QuoteIQ creates the invite on your meeting platform and links it to this
-            quote, so the transcript is matched automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="gap-2 border-t pt-4">
-          <Button asChild>
-            <Link href={`/deals/${deal.id}/brief`}>{briefReviewed ? "Schedule consultation" : "Review brief & schedule"}</Link>
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  const platform = scheduledCall.platform;
-  const steps = [
-    `Call ended on ${PLATFORM_LABEL[platform]} (${data.meeting.durationMinutes} min)`,
-    `${WEBHOOK[platform]} received`,
-    "Transcript downloaded and matched to this quote",
-    "Requirements and brief answers extracted with citations",
-    "Scope and packages drafted",
-  ];
-
-  const run = () => {
-    setStage(0);
-    steps.forEach((_, i) => {
-      window.setTimeout(() => {
-        setStage(i + 1);
-        if (i === steps.length - 1) {
-          const now = Date.now();
-          updateProgress(deal.id, {
-            callPlatform: platform,
-            callStartedAt: new Date(now - (data.meeting.durationMinutes + 3) * 60_000).toISOString(),
-            transcriptAt: new Date(now).toISOString(),
-          });
-          toast.success("Transcript received", { description: "Requirements extracted; scope and pricing drafted." });
-        }
-      }, (i + 1) * 650);
-    });
-  };
-
-  return (
-    <Card className="mx-auto max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Video className="size-4 text-primary" aria-hidden /> Consultation scheduled
-        </CardTitle>
-        <CardDescription>
-          {PLATFORM_LABEL[platform]} · {dateTime(scheduledCall.at)} PT. Hold the call as usual; no bot joins. When the
-          recording finishes, {PLATFORM_LABEL[platform]} notifies QuoteIQ and the transcript is processed automatically.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Pill tone="success">Transcript auto-fetch on</Pill>
-          <Pill>Recording consent in invite</Pill>
-        </div>
-        {stage >= 0 ? (
-          <ul className="space-y-1.5 text-sm" aria-live="polite">
-            {steps.map((s, i) => (
-              <li key={s} className={cn("flex items-center gap-2", i > stage && "text-muted-foreground")}>
-                {i < stage ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
-                ) : i === stage ? (
-                  <Loader2 className="size-4 shrink-0 animate-spin text-ai" aria-hidden />
-                ) : (
-                  <Circle className="size-4 shrink-0" aria-hidden />
-                )}
-                {s}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <DemoNote>Demo: the call itself happens outside QuoteIQ. Click below to play the moment the transcript arrives.</DemoNote>
-      </CardContent>
-      <CardFooter className="border-t pt-4">
-        <Button onClick={run} disabled={stage >= 0}>
-          {stage >= 0 ? <Loader2 className="animate-spin" /> : <FileText />}
-          {stage >= 0 ? "Processing transcript…" : "Simulate: call ends, transcript arrives"}
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-}
+// ── 3. Consultation: see ConsultationControl ───────────────────────────────
 
 function NeedsCall({ step }: { step: Step }) {
   const { deal, scheduledCall } = useDealWorkspace();
@@ -354,9 +249,7 @@ function NeedsCall({ step }: { step: Step }) {
       </CardHeader>
       <CardFooter className="gap-2 border-t pt-4">
         <Button asChild>
-          <Link href={`/deals/${deal.id}/${scheduledCall ? "meeting" : "brief"}`}>
-            {scheduledCall ? "Go to consultation" : "Schedule consultation"}
-          </Link>
+          <Link href={`/deals/${deal.id}/meeting`}>{scheduledCall ? "Go to consultation" : "Schedule consultation"}</Link>
         </Button>
       </CardFooter>
     </Card>

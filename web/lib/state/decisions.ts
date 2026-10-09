@@ -14,6 +14,8 @@ export interface DecisionState {
   docRequestsSentAt: string | null;
   findingStatus: Record<string, "proposed" | "accepted" | "rejected">;
   scheduledCall: { platform: MeetingPlatform; at: string } | null;
+  /** Set while the consultation is in progress (demo prospects), cleared when it ends. */
+  liveCallStartedAt: string | null;
   scopeIncluded: Record<string, boolean>;
   contradictionResolution: Record<string, "data" | "client">;
   recommendedPackage: PackageId;

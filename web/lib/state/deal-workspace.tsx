@@ -35,6 +35,7 @@ function initialDecisions(data: DealWorkspaceData, fresh: boolean): DecisionStat
     docRequestsSentAt: null,
     findingStatus: Object.fromEntries(data.findings.map((f) => [f.id, f.status])),
     scheduledCall: fresh ? null : { platform: data.meeting.platform, at: data.meeting.startedAt },
+    liveCallStartedAt: null,
     scopeIncluded: Object.fromEntries(data.scope.map((s) => [s.serviceId, s.included])),
     contradictionResolution: Object.fromEntries(data.contradictions.map((c) => [c.id, c.resolution])),
     recommendedPackage: data.recommendedPackage,

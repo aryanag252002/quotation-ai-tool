@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowRight, CheckCircle2, Copy, Mail, ShieldCheck, TriangleAlert, Video } from "lucide-react";
+import { CheckCircle2, Copy, Mail, ShieldCheck, TriangleAlert, Video } from "lucide-react";
 import { toast } from "sonner";
 import { AiBadge, ConfidenceBadge, Pill } from "@/components/app/status";
+import { CallStepper } from "@/components/deal/consultation-control";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -53,11 +54,11 @@ export function MeetingView() {
     </span>
   );
 
-  const pipeline = [
-    { label: "Linked via calendar invite", time: "" },
-    { label: `Recorded on ${PLATFORM_LABEL[meeting.platform]}`, time: `${meeting.durationMinutes} min` },
-    { label: "Transcript received (webhook)", time: dateTime(meeting.transcriptReceivedAt) },
-    { label: "Requirements extracted", time: `${Math.floor(meeting.extractionSeconds / 60)}m ${meeting.extractionSeconds % 60}s` },
+  const hints: [string, string, string, string] = [
+    `${PLATFORM_LABEL[meeting.platform]} · linked by calendar invite`,
+    `Held ${dateTime(meeting.startedAt)} · ${meeting.durationMinutes} min`,
+    `Received ${dateTime(meeting.transcriptReceivedAt)}`,
+    `Extracted in ${Math.floor(meeting.extractionSeconds / 60)}m ${meeting.extractionSeconds % 60}s`,
   ];
 
   return (
@@ -75,16 +76,12 @@ export function MeetingView() {
               </div>
             </div>
           </div>
-          <ol className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1 lg:justify-end">
-            {pipeline.map((p, i) => (
-              <li key={p.label} className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="size-4 text-success" aria-hidden />
-                <span>{p.label}</span>
-                <span className="num text-xs text-muted-foreground">{p.time}</span>
-                {i < pipeline.length - 1 ? <ArrowRight className="size-3.5 text-muted-foreground" aria-hidden /> : null}
-              </li>
-            ))}
-          </ol>
+          <Pill tone="success" icon={CheckCircle2} className="lg:ml-auto">
+            Call ended
+          </Pill>
+        </CardContent>
+        <CardContent>
+          <CallStepper phase="done" hints={hints} />
         </CardContent>
         <CardContent className="flex flex-wrap gap-2 border-t pt-3">
           <Pill tone="success" icon={ShieldCheck}>Recording consent logged</Pill>

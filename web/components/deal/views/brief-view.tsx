@@ -1,31 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Plus, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { AiBadge, Pill } from "@/components/app/status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { ScheduleCallDialog } from "@/components/deal/consultation-control";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { dateTime, PLATFORM_LABEL } from "@/lib/format";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
-import type { MeetingPlatform } from "@/lib/types";
 
 export function BriefView() {
-  const { deal, data, briefQuestions, briefReviewed, scheduledCall, findingStatus, set } = useDealWorkspace();
+  const { data, briefQuestions, briefReviewed, findingStatus, set } = useDealWorkspace();
   const flags = data.findings.filter((f) => f.severity !== "low" && findingStatus[f.id] !== "rejected");
 
   const updateQuestion = (id: string, question: string) =>
@@ -107,16 +94,7 @@ export function BriefView() {
       </div>
 
       <div className="space-y-4">
-        <ScheduleCard
-          meetingHref={`/deals/${deal.id}/meeting`}
-          scheduled={scheduledCall}
-          onSave={(platform, at) => {
-            set("scheduledCall", { platform, at });
-            toast.success("Consultation scheduled", {
-              description: `Calendar invite sent. The ${PLATFORM_LABEL[platform]} transcript will be fetched automatically after the call.`,
-            });
-          }}
-        />
+        <ScheduleCard />
 
         <Card>
           <CardHeader>
@@ -140,17 +118,10 @@ export function BriefView() {
   );
 }
 
-function ScheduleCard({
-  meetingHref,
-  scheduled,
-  onSave,
-}: {
-  meetingHref: string;
-  scheduled: { platform: MeetingPlatform; at: string } | null;
-  onSave: (platform: MeetingPlatform, at: string) => void;
-}) {
-  const [platform, setPlatform] = useState<MeetingPlatform>(scheduled?.platform ?? "zoom");
-  const [at, setAt] = useState(() => toLocalInput(scheduled?.at ?? tomorrowAt10()));
+function ScheduleCard() {
+  const { deal, scheduledCall, milestones } = useDealWorkspace();
+  const held = milestones.callHeld;
+  const href = `/deals/${deal.id}/meeting`;
 
   return (
     <Card>
@@ -161,88 +132,47 @@ function ScheduleCard({
         <CardDescription>Runs on your existing meeting platform. No recording app or bot is needed.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {scheduled ? (
+        {scheduledCall ? (
           <div className="flex flex-wrap items-center gap-3 rounded-md border p-3">
             <Video className="size-5 text-primary" aria-hidden />
             <div className="text-sm">
-              <div className="font-medium">{PLATFORM_LABEL[scheduled.platform]}</div>
-              <div className="text-muted-foreground">{dateTime(scheduled.at)} PT</div>
+              <div className="font-medium">{PLATFORM_LABEL[scheduledCall.platform]}</div>
+              <div className="text-muted-foreground">{dateTime(scheduledCall.at)} PT</div>
             </div>
             <Pill tone="success" className="ml-auto">
-              Transcript auto-fetch on
+              {held ? "Call held" : "Scheduled"}
             </Pill>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Not scheduled yet.</p>
         )}
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full">
-              {scheduled ? "Reschedule" : "Schedule consultation"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Schedule consultation</DialogTitle>
-              <DialogDescription>
-                QuoteIQ creates the invite in your calendar and links the meeting to this quote, so the transcript is
-                matched automatically when it’s ready.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Meeting platform</legend>
-                <RadioGroup value={platform} onValueChange={(v) => setPlatform(v as MeetingPlatform)} className="grid grid-cols-3 gap-2">
-                  {(Object.keys(PLATFORM_LABEL) as MeetingPlatform[]).map((p) => (
-                    <Label key={p} htmlFor={`pf-${p}`} className="flex cursor-pointer items-center gap-2 rounded-md border p-2.5 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-accent">
-                      <RadioGroupItem id={`pf-${p}`} value={p} />
-                      {PLATFORM_LABEL[p]}
-                    </Label>
-                  ))}
-                </RadioGroup>
-              </fieldset>
-              <div className="space-y-1.5">
-                <Label htmlFor="call-at">Date and time</Label>
-                <Input id="call-at" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
-              </div>
-              <p className="rounded-md bg-muted p-2.5 text-xs text-muted-foreground">
-                After the call, {PLATFORM_LABEL[platform]} notifies QuoteIQ when the transcript is ready (
-                {platform === "zoom" ? "recording.transcript_completed webhook" : platform === "teams" ? "Microsoft Graph transcript subscription" : "Google Workspace Events subscription"}
-                ). Recording consent is included in the invite.
-              </p>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <DialogClose asChild>
-                <Button onClick={() => onSave(platform, new Date(at).toISOString())}>Save and send invite</Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        {scheduled ? (
+        {held ? (
           <Button asChild size="sm" className="w-full">
-            <Link href={meetingHref}>
-              Go to consultation <ArrowRight />
+            <Link href={href}>
+              View transcript <ArrowRight />
             </Link>
           </Button>
-        ) : null}
+        ) : scheduledCall ? (
+          <div className="flex gap-2">
+            <ScheduleCallDialog>
+              <Button variant="outline" size="sm" className="flex-1">
+                Reschedule
+              </Button>
+            </ScheduleCallDialog>
+            <Button asChild size="sm" className="flex-1">
+              <Link href={href}>
+                Go to call <ArrowRight />
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <ScheduleCallDialog>
+            <Button size="sm" className="w-full">
+              <CalendarClock /> Schedule call
+            </Button>
+          </ScheduleCallDialog>
+        )}
       </CardContent>
     </Card>
   );
-}
-
-/** ISO → value for <input type="datetime-local"> in the viewer's time zone. */
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function tomorrowAt10() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(10, 0, 0, 0);
-  return d.toISOString();
 }
