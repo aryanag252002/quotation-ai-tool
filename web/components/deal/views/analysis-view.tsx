@@ -91,59 +91,76 @@ export function AnalysisView() {
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {data.financials.caveat}
             </p>
           ) : null}
-          {STATEMENTS.map((st) => {
-            const meta = STATEMENT_META[st];
-            const items = data.findings.filter((f) => f.statement === st);
-            const fin = data.financials[st];
-            return (
-              <section key={st} aria-labelledby={`stmt-${st}`} className="border-t">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-muted/40 px-4 py-2.5">
-                  <meta.icon className="size-4 text-muted-foreground" aria-hidden />
-                  <h3 id={`stmt-${st}`} className="text-sm font-semibold">
+          <Tabs defaultValue="pl" className="gap-0">
+            <TabsList variant="line" aria-label="Financial statement" className="w-full justify-start gap-2 border-b px-4 group-data-horizontal/tabs:h-11">
+              {STATEMENTS.map((st) => {
+                const meta = STATEMENT_META[st];
+                const items = data.findings.filter((f) => f.statement === st);
+                const high = items.filter((f) => f.severity === "high").length;
+                return (
+                  <TabsTrigger key={st} value={st} className="flex-none px-2">
+                    <meta.icon aria-hidden />
                     {meta.title}
-                  </h3>
-                  <span className="text-xs text-muted-foreground">{"period" in fin ? fin.period : `As of ${fin.asOf}`}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {items.length} finding{items.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <dl className="grid grid-cols-2 gap-px border-y bg-border lg:grid-cols-4">
-                  {fin.figures.map((fig) => (
-                    <div key={fig.label} className="space-y-0.5 bg-card px-4 py-3">
-                      <dt className="text-xs text-muted-foreground">{fig.label}</dt>
-                      <dd className="num text-lg font-semibold tracking-tight">{fig.value}</dd>
-                      {fig.hint ? (
-                        <dd
-                          className={cn(
-                            "flex items-start gap-1 text-xs",
-                            fig.tone === "danger" ? "text-danger" : fig.tone === "warning" ? "text-warning" : "text-muted-foreground",
-                          )}
-                        >
-                          {fig.tone ? <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden /> : null}
-                          {fig.hint}
-                        </dd>
-                      ) : null}
-                    </div>
-                  ))}
-                </dl>
-                {items.length ? (
-                  <ul className="divide-y">
-                    {items.map((f) => (
-                      <FindingRow
-                        key={f.id}
-                        finding={f}
-                        status={findingStatus[f.id]}
-                        onStatus={(next) => setFinding(f.id, next)}
-                        onEvidence={(sid) => setOpenSignal(byId[sid])}
-                      />
+                    <span className="num rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{items.length}</span>
+                    {high ? (
+                      <span className="num rounded bg-danger-soft px-1.5 text-[11px] text-danger" aria-label={`${high} high severity`}>
+                        {high} high
+                      </span>
+                    ) : null}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            {STATEMENTS.map((st) => {
+              const meta = STATEMENT_META[st];
+              const items = data.findings.filter((f) => f.statement === st);
+              const fin = data.financials[st];
+              return (
+                <TabsContent key={st} value={st}>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                    <span>{"period" in fin ? fin.period : `As of ${fin.asOf}`}</span>
+                    <span className="ml-auto">
+                      {items.length} finding{items.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-px border-y bg-border lg:grid-cols-4">
+                    {fin.figures.map((fig) => (
+                      <div key={fig.label} className="space-y-0.5 bg-card px-4 py-3">
+                        <dt className="text-xs text-muted-foreground">{fig.label}</dt>
+                        <dd className="num text-lg font-semibold tracking-tight">{fig.value}</dd>
+                        {fig.hint ? (
+                          <dd
+                            className={cn(
+                              "flex items-start gap-1 text-xs",
+                              fig.tone === "danger" ? "text-danger" : fig.tone === "warning" ? "text-warning" : "text-muted-foreground",
+                            )}
+                          >
+                            {fig.tone ? <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden /> : null}
+                            {fig.hint}
+                          </dd>
+                        ) : null}
+                      </div>
                     ))}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-4 text-sm text-muted-foreground">{meta.empty}</p>
-                )}
-              </section>
-            );
-          })}
+                  </dl>
+                  {items.length ? (
+                    <ul className="divide-y">
+                      {items.map((f) => (
+                        <FindingRow
+                          key={f.id}
+                          finding={f}
+                          status={findingStatus[f.id]}
+                          onStatus={(next) => setFinding(f.id, next)}
+                          onEvidence={(sid) => setOpenSignal(byId[sid])}
+                        />
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="px-4 py-4 text-sm text-muted-foreground">{meta.empty}</p>
+                  )}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
         </CardContent>
       </Card>
 
