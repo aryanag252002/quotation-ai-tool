@@ -3,6 +3,7 @@ import type { DealStage } from "@/lib/types";
 export const DEAL_STEPS = [
   { slug: "", label: "Data access", short: "Data" },
   { slug: "analysis", label: "Analysis", short: "Analysis" },
+  { slug: "requests", label: "Document request", short: "Docs" },
   { slug: "brief", label: "Pre-call brief", short: "Brief" },
   { slug: "meeting", label: "Consultation", short: "Call" },
   { slug: "scope", label: "Scope", short: "Scope" },
@@ -19,13 +20,13 @@ export function currentStepIndex(stage: DealStage): number {
     case "analyzing":
       return 1;
     case "brief_ready":
-      return 2;
-    case "call_scheduled":
       return 3;
-    case "scope_review":
+    case "call_scheduled":
       return 4;
+    case "scope_review":
+      return 5;
     case "pending_approval":
-      return 6;
+      return 7;
     default:
       return DEAL_STEPS.length;
   }

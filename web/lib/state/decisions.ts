@@ -2,13 +2,16 @@
 
 /** Analyst decisions per deal (persisted in the browser) and the stage they imply. */
 import { persistedStore } from "@/lib/state/persisted-store";
-import type { ApprovalEvent, BriefQuestion, DealStage, MeetingPlatform, OverrideReason, PackageId } from "@/lib/types";
+import type { ApprovalEvent, BriefQuestion, DocumentRequest, DealStage, MeetingPlatform, OverrideReason, PackageId } from "@/lib/types";
 
 export type QuoteStatus = "draft" | "submitted" | "approved" | "changes_requested" | "sent";
 
 export interface DecisionState {
   briefQuestions: BriefQuestion[];
   briefReviewed: boolean;
+  /** Documents requested from the client for reconciliation (editable, with received status). */
+  docRequests: DocumentRequest[];
+  docRequestsSentAt: string | null;
   findingStatus: Record<string, "proposed" | "accepted" | "rejected">;
   scheduledCall: { platform: MeetingPlatform; at: string } | null;
   scopeIncluded: Record<string, boolean>;

@@ -21,6 +21,7 @@ import {
   type MultiplierResult,
   type PackageQuote,
 } from "@/lib/engine/pricing";
+import { buildDocumentRequests } from "@/lib/engine/requests";
 import { compareSavings, type Savings } from "@/lib/engine/savings";
 import type { ApprovalEvent, Confidence, CustomDeal, Deal, DealStage, PackageId, WorkloadDrivers } from "@/lib/types";
 
@@ -30,6 +31,8 @@ function initialDecisions(data: DealWorkspaceData, fresh: boolean): DecisionStat
   return {
     briefQuestions: data.briefQuestions,
     briefReviewed: !fresh,
+    docRequests: buildDocumentRequests(data),
+    docRequestsSentAt: null,
     findingStatus: Object.fromEntries(data.findings.map((f) => [f.id, f.status])),
     scheduledCall: fresh ? null : { platform: data.meeting.platform, at: data.meeting.startedAt },
     scopeIncluded: Object.fromEntries(data.scope.map((s) => [s.serviceId, s.included])),

@@ -22,6 +22,7 @@ const LABELS: Record<string, string> = {
   new: "New prospect",
   settings: "Pricing & catalog",
   analysis: "Analysis",
+  requests: "Document request",
   brief: "Pre-call brief",
   meeting: "Consultation",
   scope: "Scope",

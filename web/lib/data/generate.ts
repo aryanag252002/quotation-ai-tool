@@ -24,6 +24,7 @@ import type {
   Finding,
   Financials,
   Industry,
+  LedgerAccount,
   LedgerSystem,
   PackageId,
   Rag,
@@ -155,6 +156,9 @@ const INDUSTRY: Record<Industry, {
 };
 
 const PAYROLL_PROVIDERS = ["Gusto", "ADP", "Paychex", "Rippling"];
+const BANKS = ["Chase", "Bank of America", "Wells Fargo", "US Bank", "PNC"];
+const BANK_ROLES = ["Operating", "Payroll", "Savings", "Reserve", "Tax"];
+const CARDS = ["Amex Business", "Chase Ink", "Capital One Spark"];
 const BOOKKEEPING_FIRMS = ["Pinecrest Bookkeeping", "Harborline Accounting", "Northgate Books & Tax", "Meridian Ledger Partners", "Bluestone Bookkeeping"];
 
 const EXTERNAL_ID_LABEL: Record<LedgerSystem, string> = {
@@ -307,6 +311,7 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
   const thousands = (n: number) => usd(Math.round(n / 1000) * 1000);
   const [asOfY, asOfM] = asOf.split("-").map(Number);
   const nonprofit = prospect.industry === "nonprofit";
+  const cash = (revenue * r.between(35, 95)) / 1000;
   const financials: Financials = {
     pl: {
       period: `12 months to ${monthName(asOf)}`,
@@ -329,7 +334,7 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
       figures: [
         {
           label: "Cash & bank",
-          value: thousands((revenue * r.between(35, 95)) / 1000),
+          value: thousands(cash),
           hint: C.behind > 1 ? `Unreconciled since ${monthName(lastRec)}` : "Reconciled to statements",
           tone: C.behind > 3 ? "danger" : C.behind > 1 ? "warning" : undefined,
         },
@@ -352,6 +357,38 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
         ? `As reported in ${isUpload ? "the exports" : sysLabel}. Nothing has been reconciled since ${monthName(lastRec)}, so these figures will move once the cleanup is done.`
         : null,
   };
+
+  // Accounts to reconcile (bank, card, processor clearing, loans)
+  const last4 = () => String(r.between(1000, 9999));
+  const bankName = r.pick(BANKS);
+  const bankShares = Array.from({ length: S.bank }, (_, i) => (i === 0 ? 0.7 : 0.3 / (S.bank - 1)));
+  const recThrough = C.behind ? lastRec : asOf;
+  const ledgerAccounts: LedgerAccount[] = [
+    ...Array.from({ length: S.bank }, (_, i) => ({
+      id: `b${i + 1}`,
+      name: `${bankName} ${BANK_ROLES[i]} ••${last4()}`,
+      kind: "bank" as const,
+      lastReconciled: recThrough,
+      balance: Math.round(cash * bankShares[i]),
+    })),
+    ...Array.from({ length: S.card }, (_, i) => ({
+      id: `c${i + 1}`,
+      name: `${CARDS[i % CARDS.length]} ••${last4()}`,
+      kind: "card" as const,
+      lastReconciled: recThrough,
+      balance: -Math.round(r.jitter(S.avgTicket * 40, 0.4)),
+    })),
+    ...processors.map((p, i) => ({
+      id: `p${i + 1}`,
+      name: `${p.replace(" Payments", "")} Clearing`,
+      kind: "clearing" as const,
+      lastReconciled: profile.condition === "clean" ? asOf : null,
+      balance: Math.round(r.jitter(S.avgTicket * 20, 0.5)),
+    })),
+    ...(S.schedules >= 3
+      ? [{ id: "l1", name: `Equipment Loan – ${bankName}`, kind: "loan" as const, lastReconciled: recThrough, balance: -Math.round(r.jitter(revenue * 0.04, 0.3)) }]
+      : []),
+  ];
 
   // Previous / current bookkeeping provider, found as vendor payments in the ledger
   const firm = r.pick(BOOKKEEPING_FIRMS);
@@ -815,6 +852,7 @@ export function generateWorkspace(deal: CustomDeal): DealWorkspaceData {
     signals,
     findings,
     financials,
+    accounts: ledgerAccounts,
     currentProvider,
     briefSummary,
     briefQuestions,

@@ -186,6 +186,36 @@ export interface CurrentProvider {
   segmentIds?: string[];
 }
 
+/** A balance-sheet account that has to be reconciled to an outside statement. */
+export interface LedgerAccount {
+  id: string;
+  /** As named in the ledger, e.g. "Chase Operating ••4411". */
+  name: string;
+  kind: "bank" | "card" | "clearing" | "loan";
+  /** Last month fully reconciled ("2026-02"); null if never reconciled. */
+  lastReconciled: string | null;
+  /** Book balance at the latest month-end. */
+  balance: number;
+}
+
+export type RequestCategory = "statements" | "processors" | "transactions" | "payroll_tax" | "balances" | "other";
+
+/** Something we need from the client before we can reconcile (or run the monthly close). */
+export interface DocumentRequest {
+  id: string;
+  category: RequestCategory;
+  title: string;
+  detail: string;
+  /** e.g. "Mar 2026 – Sep 2026". */
+  period?: string;
+  /** Statement months covered, for statement requests. */
+  months?: number;
+  /** Needed before the cleanup can start, or only for ongoing monthly work. */
+  priority: "cleanup" | "monthly";
+  signalIds?: string[];
+  received: boolean;
+}
+
 // ── Meeting & transcript ────────────────────────────────────────────────────
 
 export interface TranscriptSegment {
@@ -322,6 +352,8 @@ export interface DealWorkspaceData {
   signals: SignalValue[];
   findings: Finding[];
   financials: Financials;
+  /** Bank, card, clearing and loan accounts with their reconciliation status. */
+  accounts: LedgerAccount[];
   currentProvider: CurrentProvider | null;
   briefSummary: string;
   briefQuestions: BriefQuestion[];

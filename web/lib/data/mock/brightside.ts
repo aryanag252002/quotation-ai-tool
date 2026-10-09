@@ -11,6 +11,7 @@ import type {
   CurrentProvider,
   Finding,
   Financials,
+  LedgerAccount,
   Meeting,
   MonthlyVolume,
   Requirement,
@@ -172,6 +173,17 @@ export const financials: Financials = {
   },
   caveat: "As reported in QuickBooks. Nothing has been reconciled since February, so these figures will move once the cleanup is done.",
 };
+
+export const accounts: LedgerAccount[] = [
+  { id: "a1", name: "Chase Operating ••4411", kind: "bank", lastReconciled: "2026-02", balance: 118420 },
+  { id: "a2", name: "Chase Payroll ••7720", kind: "bank", lastReconciled: "2026-02", balance: 9540 },
+  { id: "a3", name: "Mercury Savings ••0193", kind: "bank", lastReconciled: "2026-02", balance: 14420 },
+  { id: "a4", name: "Amex Business Gold ••1007", kind: "card", lastReconciled: "2026-02", balance: -8912 },
+  { id: "a5", name: "Chase Ink ••3382", kind: "card", lastReconciled: "2026-02", balance: -3276 },
+  { id: "a6", name: "Shopify Clearing", kind: "clearing", lastReconciled: null, balance: 4180 },
+  { id: "a7", name: "Stripe Clearing", kind: "clearing", lastReconciled: null, balance: 2960 },
+  { id: "a8", name: "Equipment Loan – Live Oak Bank", kind: "loan", lastReconciled: "2026-02", balance: -86500 },
+];
 
 /** Found in the ledger (vendor payments), then confirmed on the call. */
 export const currentProvider: CurrentProvider = {

@@ -14,7 +14,7 @@ pnpm build
 
 | Path | Purpose |
 |---|---|
-| `app/(app)/…` | Authenticated app: dashboard, pipeline, intake, deal workspace (`deals/[id]/…` 7 steps), settings |
+| `app/(app)/…` | Authenticated app: dashboard, pipeline, intake, deal workspace (`deals/[id]/…` 8 steps), settings |
 | `app/portal/[token]` | Prospect-facing portal (connect books / upload, questionnaire, consent) |
 | `lib/types.ts` | Domain types mirroring the data model in `docs/architecture.md` §10 |
 | `lib/data/` | Service layer. Returns mock data today, swaps to the backend API later without UI changes |

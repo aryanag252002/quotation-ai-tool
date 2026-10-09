@@ -27,11 +27,13 @@ pnpm test         # pricing engine unit tests
 pnpm build        # production build
 ```
 
-Suggested walkthrough: **Dashboard → Quotes pipeline → Brightside Coffee Roasters**, then follow the 7 steps
-(Data access → Analysis → Pre-call brief → Consultation → Scope → Pricing → Approval & proposal).
+Suggested walkthrough: **Dashboard → Quotes pipeline → Brightside Coffee Roasters**, then follow the 8 steps
+(Data access → Analysis → Document request → Pre-call brief → Consultation → Scope → Pricing → Approval & proposal).
 Key findings are split into **Profit & loss** and **Balance sheet**, each with headline figures. Pricing compares
 the quote with what the prospect pays their current bookkeeper (found in the ledger, confirmed on the call) and the
-proposal shows the savings; the analyst can correct the figure or hide it.
+proposal shows the savings; the analyst can correct the figure or hide it. The **Document request** step lists what
+the client must send for reconciliation (statements per unreconciled account-month, payout reports, receipts for
+suspense items…), generated from the analysis.
 Open **Pricing & catalog** to change a time standard and watch the quote re-price. Use the user menu
 (bottom-left) to switch between Analyst / Manager / Partner when approving. **Reset demo** on the deal
 header restores the AI draft.

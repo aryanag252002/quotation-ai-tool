@@ -31,14 +31,14 @@ import { updateProgress } from "@/lib/state/custom-deals";
 import { useDealWorkspace } from "@/lib/state/deal-workspace";
 import { cn } from "@/lib/utils";
 
-type Step = "data" | "analysis" | "brief" | "meeting" | "scope" | "pricing" | "proposal";
+type Step = "data" | "analysis" | "requests" | "brief" | "meeting" | "scope" | "pricing" | "proposal";
 
 export function StepGate({ step, children }: { step: Step; children: React.ReactNode }) {
   const { milestones: m } = useDealWorkspace();
   if (!m.simulated) return children;
   if (!m.connected) return <AwaitingData />;
   if (!m.analysed) return <Analysing />;
-  if (step === "data" || step === "analysis" || step === "brief") return children;
+  if (step === "data" || step === "analysis" || step === "requests" || step === "brief") return children;
   if (!m.callHeld) return step === "meeting" ? <CallPending /> : <NeedsCall step={step} />;
   return children;
 }
@@ -192,8 +192,8 @@ function Analysing() {
     const timer = window.setTimeout(() => {
       updateProgress(deal.id, { analysedAt: new Date().toISOString() });
       toast.success("Analysis complete", {
-        description: "The pre-call brief is ready to review.",
-        action: { label: "Open brief", onClick: () => router.push(`/deals/${deal.id}/brief`) },
+        description: "The reconciliation document request and pre-call brief are ready.",
+        action: { label: "Document request", onClick: () => router.push(`/deals/${deal.id}/requests`) },
       });
     }, TICK_MS);
     return () => {
